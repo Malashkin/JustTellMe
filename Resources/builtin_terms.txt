@@ -1,0 +1,434 @@
+# JustTellMe — встроенный словарь (общие английские слова в русской речи).
+# Только для чтения: личные слова добавляйте в «Словарь и замены…».
+# Строки со * в начале попадают в подсказку (initial prompt) для whisper —
+# подсказка ограничена ~224 токенами, поэтому туда идут только самые частые.
+# Остальные термины используются для нормализации написания (zoom -> Zoom, iphone -> iPhone).
+
+# --- Разработка ---
+*deploy
+*pull request
+*commit
+*merge
+*feature
+*bug
+*release
+*backend
+*frontend
+*API
+*code review
+merge request
+push
+pull
+branch
+main
+master
+rebase
+cherry-pick
+hotfix
+refactoring
+rollback
+staging
+production
+prod
+dev
+QA
+CI/CD
+pipeline
+build
+deploy
+endpoint
+REST
+GraphQL
+JSON
+YAML
+SDK
+CLI
+UI
+UX
+UI/UX
+frontend
+fullstack
+DevOps
+SRE
+microservices
+Docker
+Kubernetes
+Helm
+Terraform
+AWS
+GCP
+Azure
+S3
+Lambda
+PostgreSQL
+MySQL
+MongoDB
+Redis
+Kafka
+RabbitMQ
+Elasticsearch
+ClickHouse
+SQL
+NoSQL
+JavaScript
+TypeScript
+Python
+Java
+Kotlin
+Swift
+SwiftUI
+Golang
+Rust
+PHP
+C++
+C#
+React
+React Native
+Vue
+Angular
+Next.js
+Node.js
+Django
+FastAPI
+Flask
+Spring
+iOS
+Android
+macOS
+Windows
+Linux
+Ubuntu
+GitHub
+GitLab
+Bitbucket
+Git
+Jira
+Confluence
+Notion
+Figma
+Miro
+Trello
+Asana
+Linear
+Sentry
+Grafana
+Prometheus
+Datadog
+Postman
+VS Code
+Xcode
+IntelliJ
+Cursor
+Vercel
+Netlify
+Heroku
+Cloudflare
+DNS
+SSL
+VPN
+VPS
+IP
+HTTP
+HTTPS
+URL
+OAuth
+JWT
+token
+middleware
+framework
+library
+dependency
+issue
+ticket
+task
+sprint
+backlog
+standup
+retro
+roadmap
+scope
+spec
+MVP
+POC
+PoC
+legacy
+tech debt
+unit test
+end-to-end
+e2e
+load balancer
+cache
+latency
+uptime
+downtime
+incident
+postmortem
+on-call
+log
+logs
+debug
+breakpoint
+stack trace
+crash
+timeout
+webhook
+cron
+script
+repo
+open source
+self-hosted
+SaaS
+PaaS
+IaaS
+B2B
+B2C
+CRM
+ERP
+CMS
+SEO
+SMM
+
+# --- AI ---
+*ChatGPT
+*Claude
+OpenAI
+Anthropic
+GPT
+GPT-4
+LLM
+AI
+ML
+prompt
+fine-tuning
+dataset
+embedding
+RAG
+agent
+Copilot
+Gemini
+Midjourney
+Whisper
+Perplexity
+DeepSeek
+
+# --- Работа и бизнес ---
+*feedback
+*deadline
+*meeting
+*call
+*email
+*OK
+product manager
+project manager
+PM
+CEO
+CTO
+CFO
+COO
+HR
+team lead
+tech lead
+senior
+middle
+junior
+stakeholder
+KPI
+OKR
+ROI
+P&L
+NDA
+SLA
+KPI
+case study
+use case
+pitch
+pitch deck
+demo
+onboarding
+offboarding
+remote
+office
+freelance
+startup
+venture
+investor
+round
+pre-seed
+seed
+equity
+budget
+forecast
+revenue
+growth
+churn
+retention
+conversion
+funnel
+lead
+leads
+marketing
+performance marketing
+brand
+branding
+content
+copywriting
+target audience
+insight
+benchmark
+best practice
+workflow
+pipeline
+timeline
+milestone
+follow-up
+to-do
+checklist
+dashboard
+report
+analytics
+A/B test
+B2B
+outsourcing
+offer
+invoice
+upsell
+cross-sell
+customer success
+support
+sales
+account manager
+partnership
+event
+networking
+conference
+workshop
+webinar
+podcast
+
+# --- Сервисы и приложения ---
+*Zoom
+*Slack
+*Telegram
+*Google
+WhatsApp
+Google Meet
+Google Docs
+Google Sheets
+Google Drive
+Google Calendar
+Gmail
+Outlook
+Microsoft Teams
+Teams
+Skype
+Discord
+YouTube
+Instagram
+Facebook
+LinkedIn
+TikTok
+Twitter
+Reddit
+Spotify
+Netflix
+Apple Music
+App Store
+Google Play
+Excel
+PowerPoint
+Word
+Keynote
+Pages
+Numbers
+iCloud
+Dropbox
+OneDrive
+Canva
+Photoshop
+Lightroom
+Illustrator
+Premiere
+After Effects
+Final Cut
+Loom
+Calendly
+Typeform
+Tilda
+WordPress
+Shopify
+Stripe
+PayPal
+Airbnb
+Booking
+Uber
+Amazon
+AliExpress
+Wildberries
+Ozon
+Avito
+Yandex
+Wi-Fi
+Bluetooth
+AirDrop
+FaceTime
+Safari
+Chrome
+Firefox
+
+# --- Устройства ---
+*iPhone
+*MacBook
+MacBook Air
+MacBook Pro
+iMac
+Mac mini
+iPad
+Apple Watch
+AirPods
+Apple TV
+Android
+Samsung
+Galaxy
+Pixel
+PlayStation
+Xbox
+Nintendo Switch
+USB
+USB-C
+HDMI
+SSD
+GPU
+CPU
+RAM
+
+# --- Повседневное ---
+online
+offline
+lifestyle
+lifehack
+weekend
+fitness
+spa
+coworking
+food court
+take away
+coffee break
+dress code
+selfie
+like
+story
+stories
+reels
+hashtag
+blogger
+influencer
+streaming
+playlist
+upgrade
+update
+sale
+outlet
+shopping
+cashback
+delivery
+promo code
