@@ -114,9 +114,17 @@ cp "$VAD" "$APP/Contents/Resources/ggml-silero-v6.2.0.vad"
 cp "$ROOT/Resources/builtin_terms.txt" "$ROOT/Resources/builtin_replacements.txt" "$APP/Contents/Resources/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# 6. Ad-hoc sign
-log "Signing (ad-hoc)"
-codesign --force --deep --sign - "$APP"
+# 6. Sign. A stable local identity keeps macOS permissions (Accessibility, Microphone) across rebuilds;
+# ad-hoc signatures change every build and macOS forgets the grant. Create the identity once with
+# scripts/make-signing-identity.sh; without it we fall back to ad-hoc.
+SIGN_ID="${SIGN_ID:-JustTellMe Local Signing}"
+if security find-identity -p codesigning 2>/dev/null | grep -q "\"$SIGN_ID\""; then
+  log "Signing ($SIGN_ID)"
+  codesign --force --deep --sign "$SIGN_ID" "$APP"
+else
+  log "Signing (ad-hoc — run scripts/make-signing-identity.sh to keep permissions across rebuilds)"
+  codesign --force --deep --sign - "$APP"
+fi
 codesign --verify --deep --strict "$APP"
 
 # 7. Verify no third-party dylib deps

@@ -55,6 +55,26 @@ if let i = args.firstIndex(of: "--transcribe"), i + 1 < args.count {
     exit(0)
 }
 
+//   JustTellMe --demo-overlay        (shows the recording pill for a few seconds, for screenshots)
+if args.contains("--demo-overlay") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let o = RecordingOverlay()
+    o.show(.recording)
+    var t = 0.0
+    Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+        t += 0.05
+        o.push(level: Float(0.02 + 0.08 * abs(sin(t * 3))))
+    }
+    let snap = opt("--demo-overlay")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-rec.png")) } }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { o.show(.transcribing) }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-tr.png")) } }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { o.hide() }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 5.6) { exit(0) }
+    app.run()
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

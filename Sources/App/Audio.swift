@@ -68,6 +68,8 @@ final class Recorder {
     private var rate: Double = 48_000
     private let lock = NSLock()
     private(set) var isRecording = false
+    /// Live input level (RMS of each tap buffer), delivered on the main queue for the overlay.
+    var onLevel: ((Float) -> Void)?
 
     func start() throws {
         guard !isRecording else { return }
@@ -81,6 +83,10 @@ final class Recorder {
             let n = Int(buf.frameLength)
             let chunk = UnsafeBufferPointer(start: data[0], count: n)
             self.lock.lock(); self.samples.append(contentsOf: chunk); self.lock.unlock()
+            var acc: Float = 0
+            for v in chunk { acc += v * v }
+            let level = n > 0 ? (acc / Float(n)).squareRoot() : 0
+            DispatchQueue.main.async { self.onLevel?(level) }
         }
         engine.prepare()
         try engine.start()

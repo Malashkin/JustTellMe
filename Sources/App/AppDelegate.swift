@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let recorder = Recorder()
     private let hotkey = PushToTalkHotkey(key: PushToTalkHotkey.Key(rawValue: UserDefaults.standard.string(forKey: "hotkey") ?? "") ?? .fn)
     private let welcome = WelcomeWindow()
+    private let overlay = RecordingOverlay()
+    private let historyWindow = HistoryWindow()
+    private let historyRoot = NSMenuItem(title: "История", action: nil, keyEquivalent: "")
     private var keyItems: [PushToTalkHotkey.Key: NSMenuItem] = [:]
     private let models = ModelManager()
     private let vocabWindow = VocabularyWindow()
@@ -47,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         loadActiveModel()
 
+        recorder.onLevel = { [weak self] l in self?.overlay.push(level: l) }
         hotkey.onDown = { [weak self] in self?.pttDown() }
         hotkey.onUp = { [weak self] in self?.pttUp() }
         hotkey.onCombo = { [weak self] in self?.cancelRecording() }
@@ -215,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let last = out.last, ".!?…".contains(last) { out += " " }
             self.lastResult = r.text
             self.updateStatusLine()
+            History.shared.add(text: r.text, lang: r.lang, app: NSWorkspace.shared.frontmostApplication?.localizedName, seconds: Double(audio.count) / 16_000)
             Paster.insert(out)
         }
     }
@@ -223,6 +228,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setState(_ s: State) {
         state = s
+        switch s {
+        case .recording: overlay.show(.recording)
+        case .transcribing: overlay.show(.transcribing)
+        default: overlay.hide()
+        }
         let symbol: String, tint: NSColor?
         switch s {
         case .loading: symbol = "hourglass"; tint = nil
@@ -312,6 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let copyLast = NSMenuItem(title: "Скопировать последний текст", action: #selector(copyLast), keyEquivalent: "")
         copyLast.target = self
         menu.addItem(copyLast)
+        historyRoot.submenu = NSMenu()
+        menu.addItem(historyRoot)
 
         menu.addItem(.separator())
         loginItem.target = self
@@ -384,8 +396,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         builtinItem.state = Vocabulary.shared.builtinEnabled ? .on : .off
         builtinItem.title = "Встроенный словарь ru/en (\(Vocabulary.shared.builtinTerms.count) слов)"
         rebuildModelMenu()
+        rebuildHistoryMenu()
         refreshPermissionItems()
     }
+
+    private func rebuildHistoryMenu() {
+        guard let m = historyRoot.submenu else { return }
+        m.removeAllItems()
+        m.autoenablesItems = false
+        let recent = History.shared.entries.prefix(10)
+        if recent.isEmpty {
+            let empty = NSMenuItem(title: "Пока пусто", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            m.addItem(empty)
+        } else {
+            let hint = NSMenuItem(title: "Клик — скопировать", action: nil, keyEquivalent: "")
+            hint.isEnabled = false
+            m.addItem(hint)
+            for e in recent {
+                let short = e.text.count > 60 ? String(e.text.prefix(60)) + "…" : e.text
+                let it = NSMenuItem(title: short, action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+                it.target = self
+                it.representedObject = e.text
+                it.toolTip = e.text
+                m.addItem(it)
+            }
+        }
+        m.addItem(.separator())
+        let all = NSMenuItem(title: "Вся история… (\(History.shared.entries.count))", action: #selector(openHistory), keyEquivalent: "")
+        all.target = self
+        m.addItem(all)
+    }
+
+    @objc private func copyHistoryItem(_ sender: NSMenuItem) {
+        guard let t = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(t, forType: .string)
+    }
+
+    @objc private func openHistory() { historyWindow.open() }
 
     @objc private func toggleBuiltin() { Vocabulary.shared.builtinEnabled.toggle() }
 
