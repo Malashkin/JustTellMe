@@ -98,17 +98,21 @@ final class RecordingOverlay {
 private final class WaveView: NSView {
     var mode: RecordingOverlay.Mode = .recording
     private let count = 18
-    private var levels: [CGFloat]
+    private var levels: [CGFloat]     // sampled history, scrolls left
+    private var shown: [CGFloat]      // what is drawn, eases toward `levels`
     private var target: CGFloat = 0
     private var phase: CGFloat = 0
+    private var ticks = 0
+    private let samplesPerSecond = 10  // scroll speed while recording
 
     override init(frame: NSRect) {
         levels = Array(repeating: 0, count: count)
+        shown = levels
         super.init(frame: frame)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func reset() { levels = Array(repeating: 0, count: count); target = 0 }
+    func reset() { levels = Array(repeating: 0, count: count); shown = levels; target = 0 }
 
     func push(_ rms: Float) {
         // Speech RMS is ~0.01–0.2; map to 0…1 on a log-ish curve so quiet voices still move.
@@ -117,12 +121,17 @@ private final class WaveView: NSView {
     }
 
     func tick() {
-        phase += 0.12
+        ticks += 1
         if mode == .recording {
-            levels.removeFirst()
-            let jitter = CGFloat.random(in: 0.75...1.0)
-            levels.append(target * jitter)
-            target *= 0.88
+            phase += 0.05
+            if ticks % (60 / samplesPerSecond) == 0 {
+                levels.removeFirst()
+                levels.append(target * CGFloat.random(in: 0.85...1.0))
+                target *= 0.6
+            }
+            for i in 0..<count { shown[i] += (levels[i] - shown[i]) * 0.18 }
+        } else {
+            phase += 0.12
         }
         needsDisplay = true
     }
@@ -141,7 +150,7 @@ private final class WaveView: NSView {
             default:
                 // Centre-weighted so the shape reads as a voice waveform, with a small idle pulse.
                 let centre = 1 - abs(CGFloat(i) - CGFloat(count - 1) / 2) / CGFloat(count) * 0.9
-                amp = max(0.12 + 0.04 * sin(phase + CGFloat(i) * 0.6), levels[i] * centre)
+                amp = max(0.12 + 0.04 * sin(phase + CGFloat(i) * 0.6), shown[i] * centre)
                 color = .white
             }
             let bh = max(barW, h * amp)
