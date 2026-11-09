@@ -70,10 +70,14 @@ final class Transcriber {
                         vocabulary: Vocabulary? = Vocabulary.shared) -> Result {
         let t0 = Date()
         guard let ctx, !samples.isEmpty else { return Result(text: "", raw: "", lang: "", seconds: 0) }
+        // "auto": decode as Russian without a separate language-detection pass (that pass costs a
+        // whole extra encoder run). Forced-"ru" Whisper still writes English speech and English
+        // terms in Latin script; the language label is then taken from the script of the result.
+        let whisperLang = language == "auto" ? "ru" : language
         var out = [CChar](repeating: 0, count: 64 * 1024)
         var lang = [CChar](repeating: 0, count: 8)
         let rc = samples.withUnsafeBufferPointer { buf in
-            vf_transcribe(ctx, buf.baseAddress, Int32(buf.count), language, prompt, Int32(threads), fast,
+            vf_transcribe(ctx, buf.baseAddress, Int32(buf.count), whisperLang, prompt, Int32(threads), fast,
                           &out, Int32(out.count), &lang)
         }
         if rc != 0 { NSLog("JustTellMe: transcribe failed rc=\(rc)") }
@@ -81,18 +85,37 @@ final class Transcriber {
         // Prompt echo on near-silence: the model just repeats the priming text.
         if let p = prompt?.lowercased(), raw.count >= 12,
            p.contains(raw.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".!? "))) { raw = "" }
-        let used = String(cString: lang)
+        let used = language == "auto" ? Transcriber.scriptLanguage(raw) : String(cString: lang)
         let text = vocabulary?.apply(raw, lang: used) ?? raw
         return Result(text: text, raw: raw, lang: used, seconds: Date().timeIntervalSince(t0))
     }
 
     func transcribe(_ samples: [Float], language: String, prompt: String?, completion: @escaping (Result) -> Void) {
+        transcribe(samples, setup: { (language, prompt) }, completion: completion)
+    }
+
+    /// `setup` and `onQueue` run on the inference queue right before / after this job, i.e. after all
+    /// earlier jobs finished — so a job can depend on the result of the previous one.
+    func transcribe(_ samples: [Float], setup: @escaping () -> (language: String, prompt: String?),
+                    onQueue: ((Result) -> Void)? = nil, completion: @escaping (Result) -> Void) {
         queue.async {
             if self.ctx == nil, let u = self.loadedURL { _ = self.loadSync(u) }
+            let (language, prompt) = setup()
             let r = self.transcribeSync(samples, language: language, prompt: prompt)
             self.lastUse = Date()
+            onQueue?(r)
             DispatchQueue.main.async { completion(r) }
         }
+    }
+
+    /// "en" if the text is mostly Latin letters, otherwise "ru".
+    static func scriptLanguage(_ t: String) -> String {
+        var latin = 0, cyr = 0
+        for u in t.unicodeScalars {
+            if ("a"..."z").contains(u) || ("A"..."Z").contains(u) { latin += 1 }
+            else if (0x0400...0x04FF).contains(u.value) { cyr += 1 }
+        }
+        return latin > cyr ? "en" : "ru"
     }
 
     /// Trim and drop the classic whisper hallucinations on silence/noise.

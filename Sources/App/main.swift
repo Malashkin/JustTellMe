@@ -75,6 +75,35 @@ if args.contains("--demo-overlay") {
     app.run()
 }
 
+//   JustTellMe --stream file.wav [--lang auto]   (plays the file in real time through the streaming path, prints latency after "release")
+if let file = opt("--stream") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    guard let m = ModelManager.active(), let audio = try? AudioUtil.loadFile(URL(fileURLWithPath: file)) else { log("ERROR: model or audio"); exit(2) }
+    let t = Transcriber()
+    guard t.loadSync(m.url) else { exit(2) }
+    let rec = Recorder()
+    let sess = StreamingDictation(recorder: rec, transcriber: t, language: opt("--lang") ?? "auto", prompt: Vocabulary.shared.prompt())
+    var pos = 0
+    let step = 16_000 / 10
+    Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+        let n = min(step, audio.count - pos)
+        if n > 0 { rec.debugAppend(Array(audio[pos..<(pos + n)]), rate: 16_000); pos += n }
+        if Int(pos) % 8000 == 0 { sess.poll() }
+        if pos >= audio.count {
+            timer.invalidate()
+            let released = Date()
+            let early = sess.piecesSent
+            sess.finish { r in
+                log(String(format: "audio %.1fs, pieces sent while speaking: %d, ready %.2fs after release", Double(audio.count) / 16_000, early, Date().timeIntervalSince(released)))
+                print(r.text)
+                exit(0)
+            }
+        }
+    }
+    app.run()
+}
+
 //   JustTellMe --demo-paste "text"   (clipboard round-trip self-test without sending ⌘V)
 if let text = opt("--demo-paste") {
     let app = NSApplication.shared

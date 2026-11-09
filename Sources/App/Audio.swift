@@ -101,13 +101,29 @@ final class Recorder {
         isRecording = true
     }
 
-    /// Stops and returns 16 kHz mono audio.
+    /// Stops and returns 16 kHz mono audio. The raw samples stay readable via `raw(_:)` until the next start.
     func stop() -> [Float] {
         guard isRecording else { return [] }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         isRecording = false
-        lock.lock(); let raw = samples; samples.removeAll(); lock.unlock()
+        lock.lock(); let raw = samples; lock.unlock()
         return AudioUtil.resampleTo16k(raw, rate: rate)
+    }
+
+    /// Test hook (--stream): pretend the mic delivered these samples.
+    func debugAppend(_ chunk: [Float], rate: Double) {
+        lock.lock(); self.rate = rate; samples.append(contentsOf: chunk); lock.unlock()
+    }
+
+    /// Device sample rate of the current/last recording.
+    var sampleRate: Double { rate }
+    /// Number of raw (device-rate) samples captured so far.
+    var rawCount: Int { lock.lock(); defer { lock.unlock() }; return samples.count }
+    /// Copy of raw samples in `range` (clamped).
+    func raw(_ range: Range<Int>) -> [Float] {
+        lock.lock(); defer { lock.unlock() }
+        let r = range.clamped(to: 0..<samples.count)
+        return Array(samples[r])
     }
 }

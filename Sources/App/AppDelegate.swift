@@ -42,6 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var handsFree = false
     private var ignoreNextUp = false
     private var job = 0
+    private var session: StreamingDictation?
+    private var pollTimer: Timer?
     private var language: String {
         get { UserDefaults.standard.string(forKey: "language") ?? "auto" }
         set { UserDefaults.standard.set(newValue, forKey: "language") }
@@ -204,6 +206,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try recorder.start()
             recordStart = Date()
             handsFree = false
+            let sess = StreamingDictation(recorder: recorder, transcriber: transcriber, language: language, prompt: Vocabulary.shared.prompt())
+            session = sess
+            pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in sess.poll() }
             setState(.recording)
             if Prefs.sounds { NSSound(named: "Tink")?.play() }
             if Prefs.muteWhileRecording {
@@ -243,6 +248,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .recording: cancelRecording()
         case .transcribing:
             job += 1
+            session?.cancel()
+            session = nil
             setState(.idle)
         default: break
         }
@@ -251,6 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func cancelRecording() {
         guard case .recording = state else { return }
         _ = recorder.stop()
+        stopStreaming(cancel: true)
         handsFree = false
         SystemMute.end()
         setState(.idle)
@@ -262,13 +270,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let audio = recorder.stop()
         SystemMute.end()
         if Prefs.sounds { NSSound(named: "Pop")?.play() }
-        if AudioUtil.rms(audio) < 0.0015 { setState(.idle); return } // silence
+        guard let sess = session, AudioUtil.rms(audio) >= 0.0015 else { stopStreaming(cancel: true); setState(.idle); return } // silence
+        stopStreaming(cancel: false)
         setState(.transcribing)
         job += 1
         let myJob = job
-        transcriber.transcribe(audio, language: language, prompt: Vocabulary.shared.prompt()) { [weak self] r in
+        let released = Date()
+        let early = sess.piecesSent
+        sess.finish { [weak self] r in
             guard let self else { return }
-            NSLog("JustTellMe: [\(r.lang)] %.1fs audio -> %.2fs: \(r.text)", Double(audio.count) / 16_000, r.seconds)
+            NSLog("JustTellMe: [\(r.lang)] %.1fs audio, %d piece(s) sent while speaking, ready %.2fs after release: \(r.text)",
+                  Double(audio.count) / 16_000, early, Date().timeIntervalSince(released))
             self.transcriber.scheduleIdleUnload()
             guard myJob == self.job else { return } // cancelled with Esc
             self.setState(.idle)
@@ -280,6 +292,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             History.shared.add(text: r.text, lang: r.lang, app: NSWorkspace.shared.frontmostApplication?.localizedName, seconds: Double(audio.count) / 16_000)
             Paster.shared.insert(out)
         }
+    }
+
+    private func stopStreaming(cancel: Bool) {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        if cancel { session?.cancel(); session = nil }
     }
 
     // MARK: - Status icon
