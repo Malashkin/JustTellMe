@@ -62,7 +62,8 @@ final class RecordingOverlay {
         p.level = .statusBar
         p.isOpaque = false
         p.backgroundColor = .clear
-        p.hasShadow = true
+        // A window shadow on a borderless panel is drawn around the rectangular frame, not the pill.
+        p.hasShadow = false
         p.ignoresMouseEvents = true
         p.hidesOnDeactivate = false
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -72,11 +73,13 @@ final class RecordingOverlay {
         bg.appearance = NSAppearance(named: .vibrantDark)
         bg.state = .active
         bg.blendingMode = .behindWindow
-        bg.wantsLayer = true
-        bg.layer?.cornerRadius = size.height / 2
-        bg.layer?.masksToBounds = true
-        bg.layer?.borderWidth = 1
-        bg.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        // maskImage (not layer.cornerRadius) is what actually clips the behind-window blur to the pill shape.
+        let radius = size.height / 2
+        bg.maskImage = NSImage(size: size, flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
         wave.frame = bg.bounds.insetBy(dx: 18, dy: 8)
         bg.addSubview(wave)
         p.contentView = bg
