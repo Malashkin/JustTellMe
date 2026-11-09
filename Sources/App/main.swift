@@ -75,6 +75,25 @@ if args.contains("--demo-overlay") {
     app.run()
 }
 
+//   JustTellMe --demo-stats out.png   (renders the dashboard with synthetic history, for checking the layout)
+if let out = opt("--demo-stats") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let texts = ["Привет, посмотри пожалуйста этот pull request и оставь комментарии", "Let's ship the release on Friday",
+                 "Созвон переносим на завтра в 11", "Нужно обновить README и добавить скриншоты", "Thanks, looks good to me"]
+    let apps = ["Slack", "Telegram", "Cursor", "Google Chrome", "Notes"]
+    var fake: [HistoryEntry] = []
+    for i in 0..<180 {
+        let t = texts[i % texts.count]
+        fake.append(HistoryEntry(id: UUID(), date: Date().addingTimeInterval(-Double((i * 37) % 26) * 86_400 - Double(i * 611 % 40_000)),
+                                 text: t, lang: t.first!.isASCII ? "en" : "ru", app: apps[(i * 7) % apps.count], seconds: Double(t.count) / 14))
+    }
+    let w = StatsWindow()
+    w.source = { fake }
+    w.snapshot(to: URL(fileURLWithPath: out))
+    exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

@@ -16,6 +16,7 @@ final class History {
 
     private(set) var entries: [HistoryEntry] = []   // newest first
     var onChange: (() -> Void)?
+    var onStatsChange: (() -> Void)?
     private var url: URL { Paths.support.appendingPathComponent("history.json") }
 
     private init() {
@@ -38,6 +39,7 @@ final class History {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = .prettyPrinted
         if let d = try? enc.encode(entries) { try? d.write(to: url, options: .atomic) }
         onChange?()
+        onStatsChange?()
     }
 }
 

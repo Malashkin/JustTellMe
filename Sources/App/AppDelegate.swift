@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let welcome = WelcomeWindow()
     private let overlay = RecordingOverlay()
     private let historyWindow = HistoryWindow()
+    private let statsWindow = StatsWindow()
     private let historyRoot = NSMenuItem(title: "История", action: nil, keyEquivalent: "")
     private var keyItems: [PushToTalkHotkey.Key: NSMenuItem] = [:]
     private let models = ModelManager()
@@ -322,6 +323,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let copyLast = NSMenuItem(title: "Скопировать последний текст", action: #selector(copyLast), keyEquivalent: "")
         copyLast.target = self
         menu.addItem(copyLast)
+        let stats = NSMenuItem(title: "Статистика…", action: #selector(openStats), keyEquivalent: "")
+        stats.target = self
+        menu.addItem(stats)
         historyRoot.submenu = NSMenu()
         menu.addItem(historyRoot)
 
@@ -435,6 +439,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openHistory() { historyWindow.open() }
+
+    @objc private func openStats() {
+        statsWindow.onOpenHistory = { [weak self] in self?.historyWindow.open() }
+        statsWindow.open()
+    }
 
     @objc private func toggleBuiltin() { Vocabulary.shared.builtinEnabled.toggle() }
 
