@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let fixItem = NSMenuItem(title: "Исправить последнюю фразу…", action: #selector(fixLast), keyEquivalent: "")
     private let builtinItem = NSMenuItem(title: "Встроенный словарь ru/en", action: #selector(toggleBuiltin), keyEquivalent: "")
     private var langItems: [String: NSMenuItem] = [:]
+    private let secureItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let settingsRoot = NSMenuItem(title: "Настройки", action: nil, keyEquivalent: "")
 
     private let transcriber = Transcriber()
     private let recorder = Recorder()
@@ -36,6 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var downloadProgress: Double?
 
     private let minHold: TimeInterval = 0.3
+    private let maxHandsFree: TimeInterval = 5 * 60
+    private var handsFree = false
+    private var ignoreNextUp = false
+    private var job = 0
     private var language: String {
         get { UserDefaults.standard.string(forKey: "language") ?? "auto" }
         set { UserDefaults.standard.set(newValue, forKey: "language") }
@@ -55,6 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.onDown = { [weak self] in self?.pttDown() }
         hotkey.onUp = { [weak self] in self?.pttUp() }
         hotkey.onCombo = { [weak self] in self?.cancelRecording() }
+        hotkey.onEscape = { [weak self] in self?.escapePressed() }
+        applyUnloadPref()
 
         models.onProgress = { [weak self] _, p in self?.downloadProgress = p; self?.rebuildModelMenu() }
         models.onFinished = { [weak self] file, err in self?.downloadFinished(file, err) }
@@ -177,6 +185,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Push to talk
 
     private func pttDown() {
+        // Hands-free recording in progress: this tap ends it (and its key-up is ignored).
+        if case .recording = state, handsFree {
+            ignoreNextUp = true
+            finishRecording()
+            return
+        }
         guard case .idle = state else { return }
         let mic = AVCaptureDevice.authorizationStatus(for: .audio)
         guard mic == .authorized else {
@@ -185,11 +199,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else { NSSound.beep(); refreshPermissionItems() }
             return
         }
+        transcriber.prewarm()
         do {
             try recorder.start()
             recordStart = Date()
+            handsFree = false
             setState(.recording)
-            NSSound(named: "Tink")?.play()
+            if Prefs.sounds { NSSound(named: "Tink")?.play() }
+            if Prefs.muteWhileRecording {
+                // Let the start sound play out before muting.
+                DispatchQueue.main.asyncAfter(deadline: .now() + (Prefs.sounds ? 0.2 : 0)) {
+                    if case .recording = self.state { SystemMute.begin() }
+                }
+            }
         } catch {
             NSLog("JustTellMe: mic start failed: \(error)")
             setState(.error("микрофон недоступен"))
@@ -197,23 +219,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private func pttUp() {
+        if ignoreNextUp { ignoreNextUp = false; return }
+        guard case .recording = state, !handsFree else { return }
+        if Date().timeIntervalSince(recordStart) < minHold {
+            guard Prefs.trigger == .holdOrTap else { cancelRecording(); return }
+            // Short tap: keep listening until the next tap (or Esc).
+            handsFree = true
+            overlay.locked = true
+            let started = recordStart
+            DispatchQueue.main.asyncAfter(deadline: .now() + maxHandsFree) { [weak self] in
+                guard let self, case .recording = self.state, self.handsFree, self.recordStart == started else { return }
+                self.finishRecording()
+            }
+            return
+        }
+        finishRecording()
+    }
+
+    /// Esc: drop the current recording, or discard a transcription that is still running.
+    private func escapePressed() {
+        switch state {
+        case .recording: cancelRecording()
+        case .transcribing:
+            job += 1
+            setState(.idle)
+        default: break
+        }
+    }
+
     private func cancelRecording() {
         guard case .recording = state else { return }
         _ = recorder.stop()
+        handsFree = false
+        SystemMute.end()
         setState(.idle)
     }
 
-    private func pttUp() {
+    private func finishRecording() {
         guard case .recording = state else { return }
-        let held = Date().timeIntervalSince(recordStart)
+        handsFree = false
         let audio = recorder.stop()
-        if held < minHold { setState(.idle); return }
-        NSSound(named: "Pop")?.play()
+        SystemMute.end()
+        if Prefs.sounds { NSSound(named: "Pop")?.play() }
         if AudioUtil.rms(audio) < 0.0015 { setState(.idle); return } // silence
         setState(.transcribing)
+        job += 1
+        let myJob = job
         transcriber.transcribe(audio, language: language, prompt: Vocabulary.shared.prompt()) { [weak self] r in
             guard let self else { return }
             NSLog("JustTellMe: [\(r.lang)] %.1fs audio -> %.2fs: \(r.text)", Double(audio.count) / 16_000, r.seconds)
+            self.transcriber.scheduleIdleUnload()
+            guard myJob == self.job else { return } // cancelled with Esc
             self.setState(.idle)
             guard !r.text.isEmpty else { return }
             var out = r.text
@@ -221,7 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.lastResult = r.text
             self.updateStatusLine()
             History.shared.add(text: r.text, lang: r.lang, app: NSWorkspace.shared.frontmostApplication?.localizedName, seconds: Double(audio.count) / 16_000)
-            Paster.insert(out)
+            Paster.shared.insert(out)
         }
     }
 
@@ -278,6 +335,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lastLine.isEnabled = false
         menu.addItem(statusLine)
         menu.addItem(lastLine)
+        secureItem.isEnabled = false
+        secureItem.isHidden = true
+        menu.addItem(secureItem)
         for it in [accessItem, micItem] { it.target = self; menu.addItem(it) }
         let welcomeItem = NSMenuItem(title: "Состояние и подсказка…", action: #selector(showWelcome), keyEquivalent: "")
         welcomeItem.target = self
@@ -311,6 +371,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         modelRoot.submenu = NSMenu()
         menu.addItem(modelRoot)
         rebuildModelMenu()
+        settingsRoot.submenu = NSMenu()
+        menu.addItem(settingsRoot)
 
         menu.addItem(.separator())
         let vocab = NSMenuItem(title: "Словарь и замены…", action: #selector(openVocabulary), keyEquivalent: "")
@@ -398,6 +460,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loginItem.state = st == .enabled ? .on : .off
         loginItem.title = st == .requiresApproval ? "Запускать при входе (нужно одобрить)" : "Запускать при входе"
         builtinItem.state = Vocabulary.shared.builtinEnabled ? .on : .off
+        rebuildSettingsMenu()
+        if let who = SecureInput.isOn ? (SecureInput.holder() ?? "другое приложение") : nil {
+            secureItem.title = "⚠︎ Защищённый ввод включён (\(who)) — Esc не отменит запись"
+            secureItem.toolTip = "Так macOS защищает поле пароля или «Защищённый ввод с клавиатуры» в Терминале. Диктовка работает, но нажатия клавиш до JustTellMe не доходят."
+            secureItem.isHidden = false
+        } else {
+            secureItem.isHidden = true
+        }
         builtinItem.title = "Встроенный словарь ru/en (\(Vocabulary.shared.builtinTerms.count) слов)"
         rebuildModelMenu()
         rebuildHistoryMenu()
@@ -446,6 +516,96 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleBuiltin() { Vocabulary.shared.builtinEnabled.toggle() }
+
+    // MARK: - Settings menu
+
+    private func rebuildSettingsMenu() {
+        guard let m = settingsRoot.submenu else { return }
+        m.removeAllItems()
+        m.autoenablesItems = false
+        func item(_ title: String, _ sel: Selector, on: Bool, _ obj: Any? = nil) -> NSMenuItem {
+            let it = NSMenuItem(title: title, action: sel, keyEquivalent: "")
+            it.target = self
+            it.state = on ? .on : .off
+            it.representedObject = obj
+            m.addItem(it)
+            return it
+        }
+        func header(_ t: String) { let h = NSMenuItem(title: t, action: nil, keyEquivalent: ""); h.isEnabled = false; m.addItem(h) }
+
+        header("Клавиша \(hotkey.key.short)")
+        for t in Prefs.Trigger.allCases { _ = item(t.title, #selector(pickTrigger(_:)), on: Prefs.trigger == t, t.rawValue) }
+        header("Esc — отменить запись или распознавание")
+        m.addItem(.separator())
+        _ = item("Звуки начала и конца записи", #selector(toggleSounds), on: Prefs.sounds)
+        _ = item("Приглушать звук компьютера во время диктовки", #selector(toggleMute), on: Prefs.muteWhileRecording)
+        let clip = item("Возвращать прежний буфер обмена после вставки", #selector(toggleClipboard), on: Prefs.restoreClipboard)
+        clip.toolTip = "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена."
+        m.addItem(.separator())
+
+        let micRoot = NSMenuItem(title: "Микрофон", action: nil, keyEquivalent: "")
+        let mics = NSMenu(); mics.autoenablesItems = false
+        let sysName = AudioDevices.defaultDevice(input: true).flatMap(AudioDevices.name(of:)) ?? "—"
+        let devices = AudioDevices.inputs()
+        let current = Prefs.micUID.flatMap { uid in devices.contains { $0.uid == uid } ? uid : nil }
+        let sys = NSMenuItem(title: "Как в системе (\(sysName))", action: #selector(pickMic(_:)), keyEquivalent: "")
+        sys.target = self
+        sys.state = current == nil ? .on : .off
+        mics.addItem(sys)
+        mics.addItem(.separator())
+        for d in devices {
+            let it = NSMenuItem(title: d.name, action: #selector(pickMic(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = d.uid
+            it.state = d.uid == current ? .on : .off
+            mics.addItem(it)
+        }
+        if let uid = Prefs.micUID, current == nil {
+            let gone = NSMenuItem(title: "Выбранный микрофон не подключён — используется системный", action: nil, keyEquivalent: "")
+            gone.isEnabled = false
+            gone.toolTip = uid
+            mics.addItem(.separator())
+            mics.addItem(gone)
+        }
+        micRoot.submenu = mics
+        m.addItem(micRoot)
+
+        let unloadRoot = NSMenuItem(title: "Выгружать модель из памяти", action: nil, keyEquivalent: "")
+        let un = NSMenu(); un.autoenablesItems = false
+        for (mins, title) in [(0, "Никогда (самый быстрый ответ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя"), (60, "Через час простоя")] {
+            let it = NSMenuItem(title: title, action: #selector(pickUnload(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = mins
+            it.state = Prefs.unloadAfterMinutes == mins ? .on : .off
+            un.addItem(it)
+        }
+        let note = NSMenuItem(title: "После выгрузки первая диктовка чуть дольше", action: nil, keyEquivalent: "")
+        note.isEnabled = false
+        un.addItem(.separator())
+        un.addItem(note)
+        unloadRoot.submenu = un
+        m.addItem(unloadRoot)
+    }
+
+    @objc private func pickTrigger(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let t = Prefs.Trigger(rawValue: raw) { Prefs.trigger = t }
+    }
+    @objc private func toggleSounds() { Prefs.sounds.toggle() }
+    @objc private func toggleMute() { Prefs.muteWhileRecording.toggle() }
+    @objc private func toggleClipboard() { Prefs.restoreClipboard.toggle() }
+    @objc private func pickMic(_ sender: NSMenuItem) { Prefs.micUID = sender.representedObject as? String }
+    @objc private func pickUnload(_ sender: NSMenuItem) {
+        Prefs.unloadAfterMinutes = sender.representedObject as? Int ?? 0
+        applyUnloadPref()
+    }
+
+    private func applyUnloadPref() {
+        let m = Prefs.unloadAfterMinutes
+        transcriber.idleUnload = m > 0 ? TimeInterval(m * 60) : nil
+        transcriber.scheduleIdleUnload()
+    }
+
+    func applicationWillTerminate(_ note: Notification) { SystemMute.end() }
 
     @objc private func pickHotkey(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let k = PushToTalkHotkey.Key(rawValue: raw) else { return }

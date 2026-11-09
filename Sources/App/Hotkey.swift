@@ -40,6 +40,8 @@ final class PushToTalkHotkey {
     var onUp: (() -> Void)?
     /// Called when another key is pressed while the hotkey is held (a shortcut, not dictation).
     var onCombo: (() -> Void)?
+    /// Esc pressed (any time; the app decides whether there is something to cancel).
+    var onEscape: (() -> Void)?
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
@@ -79,7 +81,11 @@ final class PushToTalkHotkey {
             if down && !held { held = true; DispatchQueue.main.async { self.onDown?() } }
             else if !down && held { held = false; DispatchQueue.main.async { self.onUp?() } }
         case .keyDown:
-            if held { DispatchQueue.main.async { self.onCombo?() } }
+            if event.getIntegerValueField(.keyboardEventKeycode) == 53 { // kVK_Escape
+                DispatchQueue.main.async { self.onEscape?() }
+            } else if held {
+                DispatchQueue.main.async { self.onCombo?() }
+            }
         default: break
         }
     }

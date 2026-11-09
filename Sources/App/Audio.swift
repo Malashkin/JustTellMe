@@ -61,9 +61,10 @@ enum AudioUtil {
 }
 
 /// Microphone recorder. The engine runs only while recording (so the orange mic
-/// indicator is visible only during dictation).
+/// indicator is visible only during dictation). A fresh engine per recording picks up
+/// device changes (AirPods connected, preferred mic chosen in the menu).
 final class Recorder {
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
     private var samples: [Float] = []
     private var rate: Double = 48_000
     private let lock = NSLock()
@@ -74,7 +75,14 @@ final class Recorder {
     func start() throws {
         guard !isRecording else { return }
         lock.lock(); samples.removeAll(keepingCapacity: true); lock.unlock()
+        engine = AVAudioEngine()
         let input = engine.inputNode
+        if let uid = Prefs.micUID, let dev = AudioDevices.inputs().first(where: { $0.uid == uid }), let unit = input.audioUnit {
+            var id = dev.id
+            let err = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                           &id, UInt32(MemoryLayout<AudioDeviceID>.size))
+            if err != noErr { NSLog("JustTellMe: cannot select mic \(dev.name): \(err)") }
+        }
         let fmt = input.outputFormat(forBus: 0)
         rate = fmt.sampleRate
         input.removeTap(onBus: 0)

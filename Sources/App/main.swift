@@ -75,6 +75,32 @@ if args.contains("--demo-overlay") {
     app.run()
 }
 
+//   JustTellMe --demo-paste "text"   (clipboard round-trip self-test without sending ⌘V)
+if let text = opt("--demo-paste") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    Paster.shared.insert(text, sendKeys: false)
+    let types = NSPasteboard.general.pasteboardItems?.first?.types.map(\.rawValue) ?? []
+    print("types: \(types.joined(separator: ", "))")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { exit(0) }
+    app.run()
+}
+
+//   JustTellMe --audio-info   (microphones, output mute state, secure input)
+if args.contains("--audio-info") {
+    let def = AudioDevices.defaultDevice(input: true)
+    for d in AudioDevices.inputs() { print("mic: \(d.name)  [\(d.uid)]\(d.id == def ? "  (system default)" : "")") }
+    if let out = AudioDevices.defaultDevice(input: false) {
+        print("output: \(AudioDevices.name(of: out) ?? "?") muted=\(AudioDevices.muted(out).map { "\($0)" } ?? "n/a")")
+    }
+    print("secure input: \(SecureInput.isOn) \(SecureInput.holder() ?? "")")
+    if args.contains("--test-mute"), let out = AudioDevices.defaultDevice(input: false) {
+        SystemMute.begin(); print("after begin: muted=\(AudioDevices.muted(out).map { "\($0)" } ?? "n/a")")
+        SystemMute.end(); print("after end: muted=\(AudioDevices.muted(out).map { "\($0)" } ?? "n/a")")
+    }
+    exit(0)
+}
+
 //   JustTellMe --demo-stats out.png   (renders the dashboard with synthetic history, for checking the layout)
 if let out = opt("--demo-stats") {
     let app = NSApplication.shared

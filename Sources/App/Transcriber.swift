@@ -4,8 +4,13 @@ import Foundation
 final class Transcriber {
     private var ctx: OpaquePointer?
     private let queue = DispatchQueue(label: "justtellme.whisper", qos: .userInitiated)
+    /// The chosen model. Stays set while the model is temporarily unloaded after idle.
     private(set) var loadedURL: URL?
     var isLoaded: Bool { ctx != nil }
+    /// Free the model after this much inactivity (nil = keep it in memory).
+    var idleUnload: TimeInterval?
+    private var lastUse = Date()
+    private var idleWork: DispatchWorkItem?
     let threads: Int
 
     init() {
@@ -23,7 +28,35 @@ final class Transcriber {
         let vad = Bundle.main.url(forResource: "ggml-silero-v6.2.0", withExtension: "vad")?.path
         ctx = vf_load(url.path, vad, verbose)
         if ctx != nil { loadedURL = url }
+        lastUse = Date()
         return ctx != nil
+    }
+
+    /// Start loading a temporarily unloaded model now (e.g. when recording starts), so it is ready by the time speech ends.
+    func prewarm() {
+        idleWork?.cancel()
+        queue.async {
+            guard self.ctx == nil, let u = self.loadedURL else { return }
+            let t0 = Date()
+            _ = self.loadSync(u)
+            NSLog("JustTellMe: model reloaded in %.2fs", Date().timeIntervalSince(t0))
+        }
+    }
+
+    /// (Re)arm the idle timer; call on the main queue after each use.
+    func scheduleIdleUnload() {
+        idleWork?.cancel()
+        guard let after = idleUnload, after > 0 else { return }
+        let work = DispatchWorkItem { [weak self] in
+            self?.queue.async {
+                guard let self, let c = self.ctx, Date().timeIntervalSince(self.lastUse) >= after - 1 else { return }
+                vf_free(c)
+                self.ctx = nil
+                NSLog("JustTellMe: model unloaded after idle")
+            }
+        }
+        idleWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: work)
     }
 
     func load(_ url: URL, completion: @escaping (Bool) -> Void) {
@@ -55,7 +88,9 @@ final class Transcriber {
 
     func transcribe(_ samples: [Float], language: String, prompt: String?, completion: @escaping (Result) -> Void) {
         queue.async {
+            if self.ctx == nil, let u = self.loadedURL { _ = self.loadSync(u) }
             let r = self.transcribeSync(samples, language: language, prompt: prompt)
+            self.lastUse = Date()
             DispatchQueue.main.async { completion(r) }
         }
     }

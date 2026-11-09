@@ -236,7 +236,7 @@ final class WelcomeWindow: NSObject {
         icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
         let title = label("JustTellMe работает в строке меню", bold: true)
         title.font = NSFont.boldSystemFont(ofSize: 17)
-        let how = label("Зажмите \(s.hotkey), говорите, отпустите — текст вставится туда, где стоит курсор. Значок 🎙 в строке меню вверху справа.")
+        let how = label("Зажмите \(s.hotkey), говорите, отпустите — текст вставится туда, где стоит курсор. \(Prefs.trigger == .holdOrTap ? "Короткое нажатие \(s.hotkey) — диктовка без рук до следующего нажатия. " : "")Esc — отмена. Значок 🎙 в строке меню вверху справа.")
         let head = NSStackView(views: [icon, NSStackView(views: [title, how])])
         (head.arrangedSubviews[1] as! NSStackView).orientation = .vertical
         (head.arrangedSubviews[1] as! NSStackView).alignment = .leading

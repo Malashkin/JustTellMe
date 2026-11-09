@@ -9,6 +9,7 @@ final class RecordingOverlay {
     private let size = NSSize(width: 168, height: 44)
     private var panel: NSPanel?
     private let wave = WaveView()
+    private let lockDot = NSView()
     private var timer: Timer?
     private var hideWork: DispatchWorkItem?
 
@@ -16,8 +17,8 @@ final class RecordingOverlay {
         hideWork?.cancel()
         switch mode {
         case .hidden: hide(); return
-        case .recording: wave.mode = .recording; wave.reset()
-        case .transcribing: wave.mode = .transcribing
+        case .recording: if wave.mode != .recording { wave.reset() }; wave.mode = .recording
+        case .transcribing: wave.mode = .transcribing; locked = false
         }
         let p = panel ?? makePanel()
         panel = p
@@ -35,6 +36,9 @@ final class RecordingOverlay {
 
     func push(level: Float) { wave.push(level) }
 
+    /// Hands-free recording (key was tapped, not held): a red dot shows it keeps listening until the next tap.
+    var locked = false { didSet { lockDot.isHidden = !locked } }
+
     /// Debug: write the pill as PNG (used by --demo-overlay to check the look without screen recording).
     func snapshot(to url: URL) {
         guard let v = panel?.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
@@ -43,11 +47,13 @@ final class RecordingOverlay {
     }
 
     func hide() {
-        guard let p = panel, p.isVisible else { return }
+        guard let p = panel, p.isVisible else { wave.mode = .hidden; locked = false; return }
         let work = DispatchWorkItem { [weak self] in
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.2; p.animator().alphaValue = 0 }) {
                 guard self?.hideWork?.isCancelled == false else { return }
                 p.orderOut(nil)
+                self?.wave.mode = .hidden
+                self?.locked = false
                 self?.timer?.invalidate()
                 self?.timer = nil
             }
@@ -82,6 +88,12 @@ final class RecordingOverlay {
         }
         wave.frame = bg.bounds.insetBy(dx: 18, dy: 8)
         bg.addSubview(wave)
+        lockDot.frame = NSRect(x: 7, y: (size.height - 7) / 2, width: 7, height: 7)
+        lockDot.wantsLayer = true
+        lockDot.layer?.cornerRadius = 3.5
+        lockDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+        lockDot.isHidden = !locked
+        bg.addSubview(lockDot)
         p.contentView = bg
         return p
     }
