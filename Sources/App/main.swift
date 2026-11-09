@@ -2,7 +2,7 @@ import Cocoa
 
 // Hidden CLI modes (for testing the exact same code paths without UI):
 //   JustTellMe --transcribe file.wav [--lang auto|ru|en] [--model path.bin] [--no-prompt]
-//              [--prompt "..."] [--no-fast] [--repeat N] [--verbose]
+//              [--prompt "..."] [--no-fast] [--repeat N] [--verbose] [--encoder x-encoder.mlmodelc]
 //   JustTellMe --learn "recognised text" "corrected text"     (prints what would be learned)
 //   JustTellMe --list-models
 let args = CommandLine.arguments
@@ -38,8 +38,9 @@ if let i = args.firstIndex(of: "--transcribe"), i + 1 < args.count {
 
     let t = Transcriber()
     let t0 = Date()
-    guard t.loadSync(modelURL, verbose: verbose) else { log("ERROR: failed to load model \(modelURL.path)"); exit(2) }
-    log(String(format: "model load: %.2fs (threads=%d, model=%@, fast=%d)", Date().timeIntervalSince(t0), t.threads, modelURL.lastPathComponent, fast ? 1 : 0))
+    let encoder = opt("--encoder").map { URL(fileURLWithPath: $0) }   // Core ML *-encoder.mlmodelc (Neural Engine)
+    guard t.loadSync(modelURL, encoder: encoder, verbose: verbose) else { log("ERROR: failed to load model \(modelURL.path)"); exit(2) }
+    log(String(format: "model load: %.2fs (threads=%d, model=%@, fast=%d, neural engine=%d)", Date().timeIntervalSince(t0), t.threads, modelURL.lastPathComponent, fast ? 1 : 0, t.usesNeuralEngine ? 1 : 0))
     log("prompt: \(prompt ?? "<none>")")
 
     let audio: [Float]
@@ -81,7 +82,7 @@ if let file = opt("--stream") {
     app.setActivationPolicy(.accessory)
     guard let m = ModelManager.active(), let audio = try? AudioUtil.loadFile(URL(fileURLWithPath: file)) else { log("ERROR: model or audio"); exit(2) }
     let t = Transcriber()
-    guard t.loadSync(m.url) else { exit(2) }
+    guard t.loadSync(m.url, encoder: opt("--encoder").map { URL(fileURLWithPath: $0) }) else { exit(2) }
     let rec = Recorder()
     let sess = StreamingDictation(recorder: rec, transcriber: t, language: opt("--lang") ?? "auto", prompt: Vocabulary.shared.prompt())
     var pos = 0

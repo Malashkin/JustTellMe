@@ -12,6 +12,8 @@ typedef struct vf_ctx vf_ctx;
 // with VAD, clips without speech return "" and leading/trailing silence is trimmed.
 // Returns NULL on failure.
 vf_ctx *vf_load(const char *model_path, const char *vad_path, bool verbose);
+// 1 if the loaded model's encoder runs through Core ML / Neural Engine.
+int vf_uses_coreml(vf_ctx *ctx);
 void vf_free(vf_ctx *ctx);
 
 // Transcribe 16 kHz mono float PCM.

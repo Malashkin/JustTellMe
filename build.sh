@@ -34,23 +34,27 @@ if [ "$(git -C "$WSRC" rev-parse HEAD)" != "$WHISPER_COMMIT" ]; then
   git -C "$WSRC" fetch --depth 1 origin "$WHISPER_COMMIT" || git -C "$WSRC" fetch origin
   git -C "$WSRC" checkout -q "$WHISPER_COMMIT"
 fi
-# Small local patch: public whisper_set_audio_ctx() so language detection can use a short encoder window.
-if ! grep -q whisper_set_audio_ctx "$WSRC/include/whisper.h"; then
+# Small local patch: whisper_set_audio_ctx() (short encoder window for language detection),
+# Core ML encoder only on request via JTM_COREML_ENCODER, whisper_uses_coreml().
+if ! grep -q whisper_uses_coreml "$WSRC/include/whisper.h"; then
   log "Applying patches"
-  git -C "$WSRC" apply "$ROOT/patches/whisper-set-audio-ctx.patch"
+  git -C "$WSRC" checkout -q -- include/whisper.h src/whisper.cpp
+  git -C "$WSRC" apply "$ROOT/patches/whisper-jtm.patch"
 fi
 
-# 2. whisper.cpp static libs (Metal on, shaders embedded, no OpenMP => no libomp dylib)
-log "Building whisper.cpp (static, Metal)"
+# 2. whisper.cpp static libs (Metal on, shaders embedded, no OpenMP => no libomp dylib).
+# Core ML is compiled in but only used when the user turns on Neural Engine acceleration.
+log "Building whisper.cpp (static, Metal + Core ML)"
 cmake -S "$WSRC" -B "$WBUILD" -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DWHISPER_BUILD_EXAMPLES=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF \
   -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON \
+  -DWHISPER_COREML=ON -DWHISPER_COREML_ALLOW_FALLBACK=ON \
   -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF \
   -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
   -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_OS" >/dev/null
-cmake --build "$WBUILD" -j"$(sysctl -n hw.ncpu)" --target whisper >/dev/null
+cmake --build "$WBUILD" -j"$(sysctl -n hw.ncpu)" --target whisper whisper.coreml >/dev/null
 
 # 3. Model
 MODEL="$BUILD/model/$MODEL_NAME"
@@ -86,6 +90,7 @@ clang -c -O2 -arch arm64 -mmacosx-version-min="$MIN_OS" \
 
 LIBS=(
   "$WBUILD/src/libwhisper.a"
+  "$WBUILD/src/libwhisper.coreml.a"
   "$WBUILD/ggml/src/libggml.a"
   "$WBUILD/ggml/src/libggml-base.a"
   "$WBUILD/ggml/src/libggml-cpu.a"
@@ -99,7 +104,7 @@ swiftc -O -target "arm64-apple-macos$MIN_OS" \
   "$BUILD/obj/vf_whisper.o" "${LIBS[@]}" \
   -lc++ \
   -framework Cocoa -framework AVFoundation -framework ServiceManagement \
-  -framework Metal -framework MetalKit -framework Foundation -framework Accelerate \
+  -framework Metal -framework MetalKit -framework Foundation -framework Accelerate -framework CoreML \
   -o "$BUILD/$EXE"
 
 # 5. Bundle

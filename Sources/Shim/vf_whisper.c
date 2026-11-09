@@ -135,12 +135,16 @@ static bool blank(const char *s) {
     return true;
 }
 
+int vf_uses_coreml(vf_ctx *ctx) { return ctx ? whisper_uses_coreml(ctx->w) : 0; }
+
 int vf_transcribe(vf_ctx *ctx, const float *samples, int n_samples,
                   const char *language, const char *prompt, int n_threads, bool fast,
                   char *out, int out_size, char *detected_lang) {
     if (!ctx || !samples || n_samples <= 0 || !out || out_size <= 0) return -1;
     out[0] = 0;
     struct whisper_context *w = ctx->w;
+    // Core ML (Neural Engine) encoders have a fixed 30 s window: a shorter audio_ctx would not match.
+    if (whisper_uses_coreml(w)) fast = false;
 
     // Voice activity detection: skip clips with no speech (whisper hallucinates on noise) and
     // trim silence at the start/end of push-to-talk recordings (shorter audio = faster encode).

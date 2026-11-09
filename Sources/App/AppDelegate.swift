@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let historyRoot = NSMenuItem(title: "История", action: nil, keyEquivalent: "")
     private var keyItems: [PushToTalkHotkey.Key: NSMenuItem] = [:]
     private let models = ModelManager()
+    private let neural = NeuralEngine()
     private let vocabWindow = VocabularyWindow()
     private let fixWindow = CorrectionWindow()
     private var state: State = .loading
@@ -66,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.onEscape = { [weak self] in self?.escapePressed() }
         applyUnloadPref()
 
+        neural.onChange = { [weak self] in self?.neuralChanged() }
         models.onProgress = { [weak self] _, p in self?.downloadProgress = p; self?.rebuildModelMenu() }
         models.onFinished = { [weak self] file, err in self?.downloadFinished(file, err) }
         fixWindow.onCorrected = { [weak self] text in
@@ -125,9 +127,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func loadActiveModel() {
         guard let m = ModelManager.active() else { setState(.error("нет модели")); return }
         setState(.loading)
-        transcriber.load(m.url) { [weak self] ok in
+        // GPU first (ready in a second); the Neural Engine encoder is attached once macOS has prepared it.
+        transcriber.load(m.url, encoder: neural.encoder(for: m.url)) { [weak self] ok in
             self?.setState(ok ? .idle : .error("модель не загрузилась"))
             self?.rebuildModelMenu()
+        }
+        neural.update(for: m.url)
+    }
+
+    /// Neural Engine status changed: attach/detach the Core ML encoder by reloading the model.
+    private func neuralChanged() {
+        rebuildSettingsMenu()
+        guard let m = ModelManager.active() else { return }
+        let enc = neural.encoder(for: m.url)
+        guard enc != transcriber.encoderURL else { return }
+        switch state { case .loading: return; default: break }
+        transcriber.load(m.url, encoder: enc) { [weak self] ok in
+            guard let self else { return }
+            NSLog("JustTellMe: model reloaded, Neural Engine: \(self.transcriber.usesNeuralEngine)")
+            if !ok { self.setState(.error("модель не загрузилась")) }
+            self.rebuildModelMenu()
+            self.rebuildSettingsMenu()
         }
     }
 
@@ -463,7 +483,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             m.addItem(cancel)
             modelRoot.title = "Модель (загрузка \(pct)%)"
         } else {
-            modelRoot.title = "Модель: " + (transcriber.loadedURL.map { ModelInfo(url: $0, bundled: false).name } ?? "—")
+            modelRoot.title = "Модель: " + (transcriber.loadedURL.map { ModelInfo(url: $0, bundled: false).name } ?? "—") + (transcriber.usesNeuralEngine ? " · Neural Engine" : "")
         }
         m.addItem(.separator())
         let folder = NSMenuItem(title: "Открыть папку моделей", action: #selector(openModelsFolder), keyEquivalent: "")
@@ -588,6 +608,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         micRoot.submenu = mics
         m.addItem(micRoot)
 
+        m.addItem(.separator())
+        let ne = item(neuralTitle, #selector(toggleNeural), on: Prefs.neuralEngine)
+        ne.toolTip = "Тяжёлая часть Whisper считается на Neural Engine — примерно в 5 раз быстрее на M1 и не зависит от загрузки видеокарты другими приложениями. Нужно скачать 1,2 ГБ; затем macOS один раз готовит модель (до ~30 минут), пока диктовка работает как обычно."
+        if case .failed = neural.status {
+            let retry = item("Повторить подготовку Neural Engine", #selector(retryNeural), on: false)
+            retry.indentationLevel = 1
+        }
         let unloadRoot = NSMenuItem(title: "Выгружать модель из памяти", action: nil, keyEquivalent: "")
         let un = NSMenu(); un.autoenablesItems = false
         for (mins, title) in [(0, "Никогда (самый быстрый ответ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя"), (60, "Через час простоя")] {
@@ -603,6 +630,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         un.addItem(note)
         unloadRoot.submenu = un
         m.addItem(unloadRoot)
+    }
+
+    private var neuralTitle: String {
+        guard Prefs.neuralEngine else { return "Ускорение Neural Engine (скачать 1,2 ГБ)…" }
+        switch neural.status {
+        case .off: return "Ускорение Neural Engine"
+        case .downloading(let p): return "Neural Engine: скачивание \(Int(p * 100))%"
+        case .unpacking: return "Neural Engine: распаковка…"
+        case .preparing: return "Neural Engine: macOS готовит модель (один раз, до ~30 мин)…"
+        case .ready: return transcriber.usesNeuralEngine ? "Ускорение Neural Engine — работает" : "Ускорение Neural Engine — подключается…"
+        case .failed(let e): return "Neural Engine: ошибка — \(e)"
+        }
+    }
+
+    @objc private func toggleNeural() {
+        if Prefs.neuralEngine {
+            Prefs.neuralEngine = false
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            let a = NSAlert()
+            a.messageText = "Включить ускорение Neural Engine?"
+            a.informativeText = "JustTellMe скачает версию модели для Neural Engine (1,2 ГБ). Потом macOS один раз подготовит её — на M1 это до 30 минут с полной загрузкой процессора. Всё это время диктовка работает как обычно, а потом станет примерно в 5 раз быстрее.\n\nПосле обновления JustTellMe подготовка может повториться."
+            a.addButton(withTitle: "Включить")
+            a.addButton(withTitle: "Отмена")
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+            Prefs.neuralEngine = true
+        }
+        if let m = ModelManager.active() { neural.update(for: m.url) }
+        neuralChanged()
+    }
+
+    @objc private func retryNeural() {
+        guard let m = ModelManager.active() else { return }
+        neural.retry(for: m.url)
     }
 
     @objc private func pickTrigger(_ sender: NSMenuItem) {

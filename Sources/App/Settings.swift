@@ -38,6 +38,11 @@ enum Prefs {
         get { d.integer(forKey: "unloadAfterMinutes") }
         set { d.set(newValue, forKey: "unloadAfterMinutes") }
     }
+    /// Run Whisper's encoder on the Neural Engine (Core ML) when available.
+    static var neuralEngine: Bool {
+        get { d.bool(forKey: "neuralEngine") }
+        set { d.set(newValue, forKey: "neuralEngine") }
+    }
     /// CoreAudio UID of the preferred microphone; nil = system default.
     static var micUID: String? {
         get { d.string(forKey: "micUID") }

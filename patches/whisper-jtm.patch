@@ -1,0 +1,65 @@
+diff --git a/include/whisper.h b/include/whisper.h
+index 545084e..32103bb 100644
+--- a/include/whisper.h
++++ b/include/whisper.h
+@@ -375,6 +375,14 @@ extern "C" {
+     // If not null, fills the lang_probs array with the probabilities of all languages
+     // The array must be whisper_lang_max_id() + 1 in size
+     // ref: https://github.com/openai/whisper/blob/main/whisper/decoding.py#L18-L69
++    // [JustTellMe patch] Set the encoder audio context size used by the default state
++    // for subsequent whisper_lang_auto_detect() calls (0 = model default, 1500).
++    WHISPER_API void whisper_set_audio_ctx(struct whisper_context * ctx, int n_audio_ctx);
++
++    // [JustTellMe patch] 1 if the encoder runs through Core ML (set JTM_COREML_ENCODER=<path to
++    // *-encoder.mlmodelc> before init). Core ML encoders have a fixed 1500 audio context.
++    WHISPER_API int whisper_uses_coreml(struct whisper_context * ctx);
++
+     WHISPER_API int whisper_lang_auto_detect(
+             struct whisper_context * ctx,
+                                int   offset_ms,
+diff --git a/src/whisper.cpp b/src/whisper.cpp
+index 3df765c..36e32cb 100644
+--- a/src/whisper.cpp
++++ b/src/whisper.cpp
+@@ -3550,7 +3550,10 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
+     }
+ 
+ #ifdef WHISPER_USE_COREML
+-    const auto path_coreml = whisper_get_coreml_path_encoder(ctx->path_model);
++    // [JustTellMe patch] Core ML only when the app asks for it, with an explicit encoder path.
++    const char * jtm_coreml = getenv("JTM_COREML_ENCODER");
++    if (jtm_coreml && *jtm_coreml) {
++    const auto path_coreml = std::string(jtm_coreml);
+ 
+     WHISPER_LOG_INFO("%s: loading Core ML model from '%s'\n", __func__, path_coreml.c_str());
+     WHISPER_LOG_INFO("%s: first run on a device may take a while ...\n", __func__);
+@@ -3565,6 +3568,7 @@ struct whisper_state * whisper_init_state(whisper_context * ctx) {
+     } else {
+         WHISPER_LOG_INFO("%s: Core ML model loaded\n", __func__);
+     }
++    }
+ #endif
+ 
+ #ifdef WHISPER_USE_VITISAI
+@@ -4275,6 +4279,21 @@ int whisper_lang_auto_detect_with_state(
+     return whisper_lang_auto_detect_internal(ctx, state, offset_ms, n_threads, lang_probs, nullptr, nullptr);
+ }
+ 
++int whisper_uses_coreml(struct whisper_context * ctx) {
++#ifdef WHISPER_USE_COREML
++    return ctx && ctx->state && ctx->state->ctx_coreml != nullptr;
++#else
++    (void) ctx;
++    return 0;
++#endif
++}
++
++void whisper_set_audio_ctx(struct whisper_context * ctx, int n_audio_ctx) {
++    if (ctx && ctx->state) {
++        ctx->state->exp_n_audio_ctx = (n_audio_ctx > 0 && n_audio_ctx <= ctx->model.hparams.n_audio_ctx) ? n_audio_ctx : 0;
++    }
++}
++
+ int whisper_lang_auto_detect(
+         struct whisper_context * ctx,
+                            int   offset_ms,

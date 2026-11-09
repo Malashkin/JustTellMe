@@ -21,15 +21,29 @@ final class Transcriber {
         threads = Int(max(2, min(perf, 8)))
     }
 
+    /// Core ML encoder (Neural Engine) to use with the model; nil = GPU only.
+    private(set) var encoderURL: URL?
+    private var loadedEncoder: URL?
+    /// True when the loaded model actually runs its encoder on the Neural Engine.
+    private(set) var usesNeuralEngine = false
+
     /// Synchronous (re)load (call off the main thread unless in CLI mode).
-    func loadSync(_ url: URL, verbose: Bool = false) -> Bool {
-        if loadedURL == url, ctx != nil { return true }
-        if let c = ctx { vf_free(c); ctx = nil; loadedURL = nil }
+    func loadSync(_ url: URL, encoder: URL? = nil, verbose: Bool = false) -> Bool {
+        if loadedURL == url, loadedEncoder == encoder, ctx != nil { return true }
+        if let c = ctx { vf_free(c); ctx = nil }
         let vad = Bundle.main.url(forResource: "ggml-silero-v6.2.0", withExtension: "vad")?.path
+        setenv("JTM_COREML_ENCODER", encoder?.path ?? "", 1)
         ctx = vf_load(url.path, vad, verbose)
-        if ctx != nil { loadedURL = url }
+        loadedURL = ctx != nil ? url : nil
+        loadedEncoder = encoder
+        encoderURL = encoder
+        usesNeuralEngine = ctx.map { vf_uses_coreml($0) != 0 } ?? false
         lastUse = Date()
         return ctx != nil
+    }
+
+    func load(_ url: URL, encoder: URL? = nil, completion: @escaping (Bool) -> Void) {
+        queue.async { let ok = self.loadSync(url, encoder: encoder); DispatchQueue.main.async { completion(ok) } }
     }
 
     /// Start loading a temporarily unloaded model now (e.g. when recording starts), so it is ready by the time speech ends.
@@ -38,7 +52,7 @@ final class Transcriber {
         queue.async {
             guard self.ctx == nil, let u = self.loadedURL else { return }
             let t0 = Date()
-            _ = self.loadSync(u)
+            _ = self.loadSync(u, encoder: self.encoderURL)
             NSLog("JustTellMe: model reloaded in %.2fs", Date().timeIntervalSince(t0))
         }
     }
@@ -57,10 +71,6 @@ final class Transcriber {
         }
         idleWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: work)
-    }
-
-    func load(_ url: URL, completion: @escaping (Bool) -> Void) {
-        queue.async { let ok = self.loadSync(url); DispatchQueue.main.async { completion(ok) } }
     }
 
     struct Result { var text: String; var raw: String; var lang: String; var seconds: Double }
@@ -99,7 +109,7 @@ final class Transcriber {
     func transcribe(_ samples: [Float], setup: @escaping () -> (language: String, prompt: String?),
                     onQueue: ((Result) -> Void)? = nil, completion: @escaping (Result) -> Void) {
         queue.async {
-            if self.ctx == nil, let u = self.loadedURL { _ = self.loadSync(u) }
+            if self.ctx == nil, let u = self.loadedURL { _ = self.loadSync(u, encoder: self.encoderURL) }
             let (language, prompt) = setup()
             let r = self.transcribeSync(samples, language: language, prompt: prompt)
             self.lastUse = Date()
