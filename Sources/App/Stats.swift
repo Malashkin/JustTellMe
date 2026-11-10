@@ -69,8 +69,6 @@ final class StatsPane: NSObject {
         }
     }
 
-    var source: () -> [HistoryEntry] = { History.shared.entries }
-
     private(set) lazy var view: NSView = build()
     private let periodControl = NSSegmentedControl(labels: Period.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private var cards: [StatCard] = []
@@ -153,7 +151,7 @@ final class StatsPane: NSObject {
     func reload() {
         _ = view
         let now = Date()
-        let all = source()
+        let all = History.shared.entries
         let period = Period(rawValue: periodControl.selectedSegment) ?? .week
         let st = DictationStats(all.filter { period.includes($0.date, now: now) })
 

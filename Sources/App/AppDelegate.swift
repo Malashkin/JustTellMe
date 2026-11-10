@@ -298,8 +298,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let early = sess.piecesSent
         sess.finish { [weak self] r in
             guard let self else { return }
-            NSLog("JustTellMe: [\(r.lang)] %.1fs audio, %d piece(s) sent while speaking, ready %.2fs after release: \(r.text)",
-                  Double(audio.count) / 16_000, early, Date().timeIntervalSince(released))
+            NSLog("JustTellMe: [\(r.lang)] %.1fs audio, %d piece(s) sent while speaking, ready %.2fs after release, %d chars",
+                  Double(audio.count) / 16_000, early, Date().timeIntervalSince(released), r.text.count)
             self.transcriber.scheduleIdleUnload()
             guard myJob == self.job else { return } // cancelled with Esc
             self.setState(.idle)

@@ -6,7 +6,6 @@ final class Transcriber {
     private let queue = DispatchQueue(label: "justtellme.whisper", qos: .userInitiated)
     /// The chosen model. Stays set while the model is temporarily unloaded after idle.
     private(set) var loadedURL: URL?
-    var isLoaded: Bool { ctx != nil }
     /// Free the model after this much inactivity (nil = keep it in memory).
     var idleUnload: TimeInterval?
     private var lastUse = Date()
@@ -98,10 +97,6 @@ final class Transcriber {
         let used = language == "auto" ? Transcriber.scriptLanguage(raw) : String(cString: lang)
         let text = vocabulary?.apply(raw, lang: used) ?? raw
         return Result(text: text, raw: raw, lang: used, seconds: Date().timeIntervalSince(t0))
-    }
-
-    func transcribe(_ samples: [Float], language: String, prompt: String?, completion: @escaping (Result) -> Void) {
-        transcribe(samples, setup: { (language, prompt) }, completion: completion)
     }
 
     /// `setup` and `onQueue` run on the inference queue right before / after this job, i.e. after all
