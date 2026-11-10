@@ -22,15 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let transcriber = Transcriber()
     private let recorder = Recorder()
     private let hotkey = PushToTalkHotkey(key: PushToTalkHotkey.Key(rawValue: UserDefaults.standard.string(forKey: "hotkey") ?? "") ?? .fn)
-    private let welcome = WelcomeWindow()
+    private let main = MainWindow()
     private let overlay = RecordingOverlay()
-    private let historyWindow = HistoryWindow()
-    private let statsWindow = StatsWindow()
     private let historyRoot = NSMenuItem(title: "История", action: nil, keyEquivalent: "")
     private var keyItems: [PushToTalkHotkey.Key: NSMenuItem] = [:]
     private let models = ModelManager()
     private let neural = NeuralEngine()
-    private let vocabWindow = VocabularyWindow()
     private let fixWindow = CorrectionWindow()
     private var state: State = .loading
     private var recordStart = Date()
@@ -76,19 +73,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSPasteboard.general.setString(text, forType: .string)
         }
 
-        welcome.onOpenAccessibility = { [weak self] in self?.openAccessibility() }
-        welcome.onOpenMic = { [weak self] in self?.openMicSettings() }
+        main.home.onOpenAccessibility = { [weak self] in self?.openAccessibility() }
+        main.home.onOpenMic = { [weak self] in self?.openMicSettings() }
+        main.home.onFix = { [weak self] text in self?.fixWindow.open(original: text) }
+        main.home.status = { [weak self] in self?.appStatus ?? AppStatus() }
+        main.settings.host = self
 
         requestPermissions()
         if !UserDefaults.standard.bool(forKey: "welcomeShown") || !allGood {
             UserDefaults.standard.set(true, forKey: "welcomeShown")
-            showWelcome()
+            showMain()
         }
     }
 
-    /// Double-click on the app while it is already running → show the status window.
+    /// Opening the app again (Finder, Launchpad, Dock) while it is already running → show the main window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        showWelcome()
+        main.open(.home)
         return false
     }
 
@@ -108,20 +108,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return (v ?? 2) != 0
     }
 
-    @objc private func showWelcome() {
-        welcome.open { [weak self] in
-            guard let self else { return .init(hotkey: "", micOK: false, accessOK: false, modelReady: false, conflictingApp: nil, fnSwitchesInput: false) }
-            var ready = false
-            if case .idle = self.state { ready = true }
-            if case .recording = self.state { ready = true }
-            if case .transcribing = self.state { ready = true }
-            return .init(hotkey: self.hotkey.key.short,
+    @objc private func showMain() { main.open(.home) }
+
+    private var appStatus: AppStatus {
+        var ready = false
+        switch state { case .idle, .recording, .transcribing: ready = true; default: break }
+        return AppStatus(hotkey: hotkey.key.short,
                          micOK: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-                         accessOK: AXIsProcessTrusted() && self.hotkey.isInstalled,
+                         accessOK: AXIsProcessTrusted() && hotkey.isInstalled,
                          modelReady: ready,
-                         conflictingApp: self.conflictingApp,
-                         fnSwitchesInput: self.hotkey.key == .fn && self.fnHasSystemAction)
-        }
+                         conflictingApp: conflictingApp,
+                         fnSwitchesInput: hotkey.key == .fn && fnHasSystemAction)
     }
 
     private func loadActiveModel() {
@@ -138,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Neural Engine status changed: attach/detach the Core ML encoder by reloading the model.
     private func neuralChanged() {
         rebuildSettingsMenu()
+        main.refresh()
         guard let m = ModelManager.active() else { return }
         let enc = neural.encoder(for: m.url)
         guard enc != transcriber.encoderURL else { return }
@@ -148,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if !ok { self.setState(.error("модель не загрузилась")) }
             self.rebuildModelMenu()
             self.rebuildSettingsMenu()
+            self.main.refresh()
         }
     }
 
@@ -345,6 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             b.toolTip = "JustTellMe"
         }
         updateStatusLine()
+        main.refresh()
     }
 
     private func updateStatusLine() {
@@ -377,9 +377,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         secureItem.isHidden = true
         menu.addItem(secureItem)
         for it in [accessItem, micItem] { it.target = self; menu.addItem(it) }
-        let welcomeItem = NSMenuItem(title: "Состояние и подсказка…", action: #selector(showWelcome), keyEquivalent: "")
-        welcomeItem.target = self
-        menu.addItem(welcomeItem)
+        let openItem = NSMenuItem(title: "Открыть JustTellMe…", action: #selector(showMain), keyEquivalent: "o")
+        openItem.target = self
+        menu.addItem(openItem)
         menu.addItem(.separator())
 
         let keyRoot = NSMenuItem(title: "Клавиша диктовки", action: nil, keyEquivalent: "")
@@ -546,12 +546,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSPasteboard.general.setString(t, forType: .string)
     }
 
-    @objc private func openHistory() { historyWindow.open() }
-
-    @objc private func openStats() {
-        statsWindow.onOpenHistory = { [weak self] in self?.historyWindow.open() }
-        statsWindow.open()
-    }
+    @objc private func openHistory() { main.open(.home) }
+    @objc private func openStats() { main.open(.stats) }
+    @objc private func openSettings() { main.open(.settings) }
 
     @objc private func toggleBuiltin() { Vocabulary.shared.builtinEnabled.toggle() }
 
@@ -571,6 +568,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         func header(_ t: String) { let h = NSMenuItem(title: t, action: nil, keyEquivalent: ""); h.isEnabled = false; m.addItem(h) }
 
+        _ = item("Все настройки…", #selector(openSettings), on: false)
+        m.addItem(.separator())
         header("Клавиша \(hotkey.key.short)")
         for t in Prefs.Trigger.allCases { _ = item(t.title, #selector(pickTrigger(_:)), on: Prefs.trigger == t, t.rawValue) }
         header("Esc — отменить запись или распознавание")
@@ -632,6 +631,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.addItem(unloadRoot)
     }
 
+    var neuralStatusText: String {
+        switch neural.status {
+        case .off: return "Включено, запускается…"
+        case .downloading(let p): return "Скачивание \(Int(p * 100))% из 1,2 ГБ — диктовка пока работает как обычно."
+        case .unpacking: return "Распаковка…"
+        case .preparing: return "macOS готовит модель для Neural Engine (один раз, до ~30 минут). Диктовка пока работает как обычно."
+        case .ready: return transcriber.usesNeuralEngine ? "Работает." : "Подключается…"
+        case .failed(let e): return "Ошибка: \(e)"
+        }
+    }
+
     private var neuralTitle: String {
         guard Prefs.neuralEngine else { return "Ускорение Neural Engine (скачать 1,2 ГБ)…" }
         switch neural.status {
@@ -644,7 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func toggleNeural() {
+    @objc func toggleNeural() {
         if Prefs.neuralEngine {
             Prefs.neuralEngine = false
         } else {
@@ -661,7 +671,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         neuralChanged()
     }
 
-    @objc private func retryNeural() {
+    @objc func retryNeural() {
         guard let m = ModelManager.active() else { return }
         neural.retry(for: m.url)
     }
@@ -678,7 +688,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         applyUnloadPref()
     }
 
-    private func applyUnloadPref() {
+    func applyUnloadPref() {
         let m = Prefs.unloadAfterMinutes
         transcriber.idleUnload = m > 0 ? TimeInterval(m * 60) : nil
         transcriber.scheduleIdleUnload()
@@ -691,7 +701,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.key = k
         UserDefaults.standard.set(raw, forKey: "hotkey")
         updateStatusLine()
-        if k == .fn && fnHasSystemAction { showWelcome() }
+        if k == .fn && fnHasSystemAction { main.open(.home) }
     }
 
     // MARK: - Actions
@@ -708,7 +718,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         loadActiveModel()
     }
 
-    @objc private func addModelFromFile() {
+    @objc func addModelFromFile() {
         NSApp.activate(ignoringOtherApps: true)
         let p = NSOpenPanel()
         p.title = "Выберите модель whisper.cpp (ggml-*.bin)"
@@ -760,7 +770,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openHF() { NSWorkspace.shared.open(URL(string: "https://huggingface.co/ggerganov/whisper.cpp/tree/main")!) }
     @objc private func openModelsFolder() { NSWorkspace.shared.open(Paths.models) }
-    @objc private func openVocabulary() { vocabWindow.open() }
+    @objc private func openVocabulary() { main.open(.vocabulary) }
 
     @objc private func fixLast() {
         guard !lastResult.isEmpty else { return }
@@ -773,7 +783,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSPasteboard.general.setString(lastResult, forType: .string)
     }
 
-    @objc private func toggleLogin() {
+    @objc func toggleLogin() {
         let svc = SMAppService.mainApp
         do {
             if svc.status == .enabled { try svc.unregister() } else { try svc.register() }
@@ -782,4 +792,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if svc.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
     }
+}
+
+// MARK: - Settings page
+
+extension AppDelegate: SettingsHost {
+    var hotkeyKey: PushToTalkHotkey.Key { hotkey.key }
+    func setHotkey(_ k: PushToTalkHotkey.Key) {
+        let it = NSMenuItem(); it.representedObject = k.rawValue
+        pickHotkey(it)
+    }
+    var languageCode: String { language }
+    func setLanguage(_ code: String) { language = code }
+    var loadedModelPath: String? { transcriber.loadedURL?.path }
+    func selectModel(path: String) {
+        let it = NSMenuItem(); it.representedObject = path
+        pickModel(it)
+    }
+    var neuralFailed: Bool { if case .failed = neural.status { return true }; return false }
+    var launchAtLogin: Bool { SMAppService.mainApp.status == .enabled }
 }

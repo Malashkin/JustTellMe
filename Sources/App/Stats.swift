@@ -54,7 +54,7 @@ struct DictationStats {
 
 // MARK: - Window
 
-final class StatsWindow: NSObject {
+final class StatsPane: NSObject {
     enum Period: Int, CaseIterable {
         case today, week, month, all
         var title: String { ["Сегодня", "7 дней", "30 дней", "Всё время"][rawValue] }
@@ -70,9 +70,8 @@ final class StatsWindow: NSObject {
     }
 
     var source: () -> [HistoryEntry] = { History.shared.entries }
-    var onOpenHistory: (() -> Void)?
 
-    private var window: NSWindow?
+    private(set) lazy var view: NSView = build()
     private let periodControl = NSSegmentedControl(labels: Period.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private var cards: [StatCard] = []
     private let chart = BarChartView()
@@ -81,40 +80,11 @@ final class StatsWindow: NSObject {
     private let langsList = NSStackView()
     private let streakLabel = NSTextField(labelWithString: "")
 
-    func open() {
-        if window == nil { build() }
-        reload()
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
-    }
-
-    /// Debug: render the window content to PNG (used by --demo-stats).
-    func snapshot(to url: URL) {
-        if window == nil { build() }
-        reload()
-        guard let w = window, let v = w.contentView else { return }
-        w.setContentSize(NSSize(width: 760, height: 600))
-        v.wantsLayer = true
-        v.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        v.layoutSubtreeIfNeeded()
-        guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
-        v.cacheDisplay(in: v.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: url)
-    }
-
-    private func build() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 600),
-                         styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        w.title = "JustTellMe — Статистика"
-        w.isReleasedWhenClosed = false
-        w.minSize = NSSize(width: 640, height: 560)
-        w.center()
-
+    private func build() -> NSView {
         periodControl.selectedSegment = UserDefaults.standard.object(forKey: "statsPeriod") as? Int ?? Period.week.rawValue
         periodControl.target = self
         periodControl.action = #selector(periodChanged)
-        let historyBtn = NSButton(title: "Открыть историю…", target: self, action: #selector(openHistory))
-        let top = NSStackView(views: [periodControl, NSView(), historyBtn])
+        let top = NSStackView(views: [periodControl, NSView()])
 
         cards = ["Слов", "Символов", "Диктовок", "Время речи", "Скорость", "Сэкономлено"].map { StatCard(title: $0) }
         let grid = NSGridView(views: [Array(cards[0..<3]), Array(cards[3..<6])])
@@ -147,7 +117,7 @@ final class StatsWindow: NSObject {
         stack.setCustomSpacing(18, after: grid)
         stack.setCustomSpacing(4, after: chartTitle)
         stack.setCustomSpacing(18, after: chart)
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 18, bottom: 16, right: 18)
+        stack.edgeInsets = NSEdgeInsets(top: 14, left: 20, bottom: 16, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let root = NSView()
         root.addSubview(stack)
@@ -156,14 +126,11 @@ final class StatsWindow: NSObject {
             stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             stack.topAnchor.constraint(equalTo: root.topAnchor),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor),
-            root.widthAnchor.constraint(greaterThanOrEqualToConstant: 640),
         ])
-        w.contentView = root
         for v in [top, grid, chart, bottom, foot] as [NSView] {
-            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36).isActive = true
+            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
-        window = w
-        History.shared.onStatsChange = { [weak self] in if self?.window?.isVisible == true { self?.reload() } }
+        return root
     }
 
     private func section(_ title: String, _ body: NSView, extra: NSView? = nil) -> NSView {
@@ -183,9 +150,8 @@ final class StatsWindow: NSObject {
         reload()
     }
 
-    @objc private func openHistory() { onOpenHistory?() }
-
-    private func reload() {
+    func reload() {
+        _ = view
         let now = Date()
         let all = source()
         let period = Period(rawValue: periodControl.selectedSegment) ?? .week
@@ -250,7 +216,7 @@ final class StatsWindow: NSObject {
 
 // MARK: - Views
 
-private final class StatCard: NSView {
+final class StatCard: NSView {
     private let valueLabel = NSTextField(labelWithString: "—")
     var value: String { get { valueLabel.stringValue } set { valueLabel.stringValue = newValue } }
     var accent = false { didSet { valueLabel.textColor = accent ? .systemOrange : .labelColor } }
@@ -344,7 +310,7 @@ private final class BarChartView: NSView {
             NSBezierPath(roundedRect: r, xRadius: min(3, barW / 2), yRadius: min(3, barW / 2)).fill()
 
             if d.words == maxV && d.words > 0 {
-                let s = NSAttributedString(string: StatsWindow.num(d.words), attributes: small)
+                let s = NSAttributedString(string: StatsPane.num(d.words), attributes: small)
                 s.draw(at: NSPoint(x: min(x + barW / 2 - s.size().width / 2, bounds.width - s.size().width), y: labelH + h + 2))
             }
             let fromEnd = data.count - 1 - i

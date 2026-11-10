@@ -131,23 +131,25 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-stats out.png   (renders the dashboard with synthetic history, for checking the layout)
-if let out = opt("--demo-stats") {
+//   JustTellMe --demo-window out-prefix   (renders every page of the main window with the real history, for checking the layout)
+if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
-    let texts = ["Привет, посмотри пожалуйста этот pull request и оставь комментарии", "Let's ship the release on Friday",
-                 "Созвон переносим на завтра в 11", "Нужно обновить README и добавить скриншоты", "Thanks, looks good to me"]
-    let apps = ["Slack", "Telegram", "Cursor", "Google Chrome", "Notes"]
-    var fake: [HistoryEntry] = []
-    for i in 0..<180 {
-        let t = texts[i % texts.count]
-        fake.append(HistoryEntry(id: UUID(), date: Date().addingTimeInterval(-Double((i * 37) % 26) * 86_400 - Double(i * 611 % 40_000)),
-                                 text: t, lang: t.first!.isASCII ? "en" : "ru", app: apps[(i * 7) % apps.count], seconds: Double(t.count) / 14))
+    app.appearance = NSAppearance(named: .aqua)
+    let w = MainWindow()
+    w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: false, modelReady: true) }
+    var pages = MainWindow.Page.allCases
+    func next() {
+        guard let p = pages.first else { exit(0) }
+        pages.removeFirst()
+        w.open(p)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            w.snapshot(to: URL(fileURLWithPath: "\(out)-\(p.rawValue).png"))
+            next()
+        }
     }
-    let w = StatsWindow()
-    w.source = { fake }
-    w.snapshot(to: URL(fileURLWithPath: out))
-    exit(0)
+    DispatchQueue.main.async { next() }
+    app.run()
 }
 
 let app = NSApplication.shared
