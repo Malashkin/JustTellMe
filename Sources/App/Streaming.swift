@@ -111,17 +111,25 @@ final class StreamingDictation {
             for j in (i * frame)..<((i + 1) * frame) { acc += audio[j] * audio[j] }
             rms[i] = (acc / Float(frame)).squareRoot()
         }
-        let sorted = rms.sorted()
-        let floor = sorted[n * 15 / 100], peak = sorted[min(n - 1, n * 90 / 100)]
-        let threshold = max(floor * 1.5, floor + 0.2 * (peak - floor))
         let first = Int(minCutAt / 0.03)
         let need = Int(pause / 0.03)
+        guard n >= need else { return nil }
+        // Quiet level = the quietest 0.3 s stretch (a percentile breaks when pauses are rare in fluent speech).
+        var floor = Float.greatestFiniteMagnitude
+        var win = rms[0..<need].reduce(0, +)
+        for i in need...n {
+            floor = min(floor, win / Float(need))
+            if i < n { win += rms[i] - rms[i - need] }
+        }
+        let peak = rms.sorted()[min(n - 1, n * 90 / 100)]
+        let threshold = max(floor * 1.5, floor + 0.2 * (peak - floor))
+        let hasPause = floor < peak * 0.5   // otherwise the "quietest" stretch is just softer speech
 
         var best: Int?
         var run = 0
         for i in 0..<n {
             if rms[i] <= threshold { run += 1 } else { run = 0 }
-            if run >= need, i - run / 2 >= first { best = i - run / 2 }   // keep the latest pause
+            if hasPause, run >= need, i - run / 2 >= first { best = i - run / 2 }   // keep the latest pause
         }
         if let b = best { return b * frame }
         guard force, n > first + need else { return nil }

@@ -1,9 +1,10 @@
 import Foundation
 
-/// File locations: ~/Library/Application Support/JustTellMe/
+/// File locations: ~/Library/Application Support/JustTellMe/ (JTM_SUPPORT_DIR overrides it, used by tests).
 enum Paths {
     static let support: URL = {
-        let u = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let u = ProcessInfo.processInfo.environment["JTM_SUPPORT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("JustTellMe", isDirectory: true)
         try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
         return u

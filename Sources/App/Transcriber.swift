@@ -113,12 +113,16 @@ final class Transcriber {
         }
     }
 
-    /// "en" if the text is mostly Latin letters, otherwise "ru".
+    /// "en" if most words are Latin, otherwise "ru". Words, not letters: "посмотри pull request и сделай
+    /// deploy" is Russian even though its English terms are longer.
     static func scriptLanguage(_ t: String) -> String {
         var latin = 0, cyr = 0
-        for u in t.unicodeScalars {
-            if ("a"..."z").contains(u) || ("A"..."Z").contains(u) { latin += 1 }
-            else if (0x0400...0x04FF).contains(u.value) { cyr += 1 }
+        for w in t.split(whereSeparator: { !$0.isLetter }) {
+            var l = 0, c = 0
+            for u in w.unicodeScalars {
+                if ("a"..."z").contains(u) || ("A"..."Z").contains(u) { l += 1 } else if (0x0400...0x04FF).contains(u.value) { c += 1 }
+            }
+            if l > c { latin += 1 } else if c > 0 { cyr += 1 }
         }
         return latin > cyr ? "en" : "ru"
     }
