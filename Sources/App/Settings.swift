@@ -34,14 +34,22 @@ enum Prefs {
         set { d.set(newValue, forKey: "muteWhileRecording") }
     }
     /// Minutes of inactivity before the model is freed from memory; 0 = keep loaded.
+    /// Default 15: ~0.7 GB back to the system while you are not dictating. Reloading takes under a
+    /// second on the GPU and starts the moment the key is pressed, so it is hidden behind the speech.
+    static let defaultUnloadMinutes = 15
     static var unloadAfterMinutes: Int {
-        get { d.integer(forKey: "unloadAfterMinutes") }
+        get { d.object(forKey: "unloadAfterMinutes") as? Int ?? defaultUnloadMinutes }
         set { d.set(newValue, forKey: "unloadAfterMinutes") }
     }
     /// Run Whisper's encoder on the Neural Engine (Core ML) when available.
     static var neuralEngine: Bool {
         get { d.bool(forKey: "neuralEngine") }
         set { d.set(newValue, forKey: "neuralEngine") }
+    }
+    /// Look for a new version on GitHub once a day.
+    static var checkUpdates: Bool {
+        get { d.object(forKey: "checkUpdates") as? Bool ?? true }
+        set { d.set(newValue, forKey: "checkUpdates") }
     }
     /// CoreAudio UID of the preferred microphone; nil = system default.
     static var micUID: String? {

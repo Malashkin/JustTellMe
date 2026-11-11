@@ -29,7 +29,8 @@ final class RecordingOverlay {
             NSAnimationContext.runAnimationGroup { $0.duration = 0.15; p.animator().alphaValue = 1 }
         }
         if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.wave.tick() }
+            timer = Timer.scheduledTimer(withTimeInterval: 1.0 / WaveView.fps, repeats: true) { [weak self] _ in self?.wave.tick() }
+            timer?.tolerance = 0.2 / WaveView.fps
             RunLoop.main.add(timer!, forMode: .common)
         }
     }
@@ -41,8 +42,16 @@ final class RecordingOverlay {
 
     /// Debug: write the pill as PNG (used by --demo-overlay to check the look without screen recording).
     func snapshot(to url: URL) {
-        guard let v = panel?.contentView, let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
-        v.cacheDisplay(in: v.bounds, to: rep)
+        // The bars are plain CALayers, which cacheDisplay does not draw: render the layer tree instead.
+        guard let v = panel?.contentView, let layer = v.layer,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(v.bounds.width) * 2, pixelsHigh: Int(v.bounds.height) * 2,
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let ctx = NSGraphicsContext(bitmapImageRep: rep)?.cgContext else { return }
+        ctx.scaleBy(x: 2, y: 2)
+        ctx.setFillColor(NSColor(white: 0.15, alpha: 1).cgColor)
+        ctx.fill(v.bounds)
+        layer.render(in: ctx)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
     }
 
@@ -107,8 +116,12 @@ final class RecordingOverlay {
     }
 }
 
-private final class WaveView: NSView {
-    var mode: RecordingOverlay.Mode = .recording
+/// Bars are CALayers whose frames are set directly (no implicit animations), so a frame costs no
+/// view redraw: the window server only recomposites 18 small rectangles. 30 updates a second
+/// look as smooth as 60 for this motion, at half the wake-ups.
+final class WaveView: NSView {
+    static let fps = 30.0
+    var mode: RecordingOverlay.Mode = .recording { didSet { if mode != oldValue { recolor() } } }
     private let count = 18
     private var levels: [CGFloat]     // sampled history, scrolls left
     private var shown: [CGFloat]      // what is drawn, eases toward `levels`
@@ -116,13 +129,27 @@ private final class WaveView: NSView {
     private var phase: CGFloat = 0
     private var ticks = 0
     private let samplesPerSecond = 10  // scroll speed while recording
+    private var bars: [CALayer] = []
+    /// Per-frame easing toward the target, same speed as 0.18 per frame at 60 fps.
+    private static let ease = 1 - pow(1 - 0.18, 60 / fps)
 
     override init(frame: NSRect) {
         levels = Array(repeating: 0, count: count)
         shown = levels
         super.init(frame: frame)
+        wantsLayer = true
+        for _ in 0..<count {
+            let b = CALayer()
+            b.actions = ["bounds": NSNull(), "position": NSNull(), "backgroundColor": NSNull()]
+            layer?.addSublayer(b)
+            bars.append(b)
+        }
+        recolor()
+        layoutBars()
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    override func setFrameSize(_ newSize: NSSize) { super.setFrameSize(newSize); layoutBars() }
 
     func reset() { levels = Array(repeating: 0, count: count); shown = levels; target = 0 }
 
@@ -135,40 +162,48 @@ private final class WaveView: NSView {
     func tick() {
         ticks += 1
         if mode == .recording {
-            phase += 0.05
-            if ticks % (60 / samplesPerSecond) == 0 {
+            phase += 0.05 * 60 / Self.fps
+            if ticks % (Int(Self.fps) / samplesPerSecond) == 0 {
                 levels.removeFirst()
                 levels.append(target * CGFloat.random(in: 0.85...1.0))
                 target *= 0.6
             }
-            for i in 0..<count { shown[i] += (levels[i] - shown[i]) * 0.18 }
+            for i in 0..<count { shown[i] += (levels[i] - shown[i]) * Self.ease }
         } else {
-            phase += 0.12
+            phase += 0.12 * 60 / Self.fps
         }
-        needsDisplay = true
+        layoutBars()
     }
 
-    override func draw(_ dirty: NSRect) {
+    /// Height of bar i, 0…1.
+    func amplitude(_ i: Int) -> CGFloat {
+        switch mode {
+        case .transcribing:
+            return 0.25 + 0.35 * (0.5 + 0.5 * sin(phase - CGFloat(i) * 0.45))
+        default:
+            // Centre-weighted so the shape reads as a voice waveform, with a small idle pulse.
+            let centre = 1 - abs(CGFloat(i) - CGFloat(count - 1) / 2) / CGFloat(count) * 0.9
+            return max(0.12 + 0.04 * sin(phase + CGFloat(i) * 0.6), shown[i] * centre)
+        }
+    }
+
+    private func recolor() {
+        let c = mode == .transcribing ? NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.35, alpha: 0.95) : .white
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        for b in bars { b.backgroundColor = c.cgColor }
+        CATransaction.commit()
+    }
+
+    private func layoutBars() {
         let w = bounds.width, h = bounds.height
         let gap: CGFloat = 3
         let barW = (w - gap * CGFloat(count - 1)) / CGFloat(count)
-        for i in 0..<count {
-            let amp: CGFloat
-            let color: NSColor
-            switch mode {
-            case .transcribing:
-                amp = 0.25 + 0.35 * (0.5 + 0.5 * sin(phase - CGFloat(i) * 0.45))
-                color = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.35, alpha: 0.95)
-            default:
-                // Centre-weighted so the shape reads as a voice waveform, with a small idle pulse.
-                let centre = 1 - abs(CGFloat(i) - CGFloat(count - 1) / 2) / CGFloat(count) * 0.9
-                amp = max(0.12 + 0.04 * sin(phase + CGFloat(i) * 0.6), shown[i] * centre)
-                color = .white
-            }
-            let bh = max(barW, h * amp)
-            let r = NSRect(x: CGFloat(i) * (barW + gap), y: (h - bh) / 2, width: barW, height: bh)
-            color.setFill()
-            NSBezierPath(roundedRect: r, xRadius: barW / 2, yRadius: barW / 2).fill()
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        for (i, b) in bars.enumerated() {
+            let bh = max(barW, h * amplitude(i))
+            b.frame = CGRect(x: CGFloat(i) * (barW + gap), y: (h - bh) / 2, width: barW, height: bh)
+            b.cornerRadius = barW / 2
         }
+        CATransaction.commit()
     }
 }

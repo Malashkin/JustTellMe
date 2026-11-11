@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # Changelog
@@ -10,11 +10,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-11
+
 ### Added
-- `docs/` with an agent guide, product, architecture (with ADRs), build, testing and privacy docs.
+- **Updates from GitHub Releases.** JustTellMe checks for a new version once a day (can be turned off) and installs it in two clicks: download, signature and certificate check, restart. Permissions stay.
+- **⌃⌥V pastes the last dictation again** where the cursor is now (also 🎙 → «Вставить последнее ещё раз»).
+- **«Курсор не в поле ввода?» card**: when the text was most likely pasted nowhere (Finder, desktop, a list), it is shown with a «Скопировать» button. It stays quiet when it can't tell (Chrome, Electron apps).
+- `scripts/release.sh`, and hidden CLI modes `--unload-cycle`, `--focus-check`, `--demo-card`, `--update-check`, `--update-stage`, `--update-install`.
+- `docs/` with an agent guide, product, architecture (with ADRs 001–008), build, testing and privacy docs.
+- MIT license; the repository is public.
 
 ### Changed
+- **The model is freed after 15 idle minutes by default** (~0.7 GB back to the system). It reloads on the GPU the moment you press the key (0.4–0.6 s, while you speak). With Neural Engine on, the encoder is attached in the background after that dictation.
+- **The recording pill uses ~2.4× less CPU**: Core Animation bars at 30 fps instead of redrawing at 60 fps. It looks the same.
 - The microphone permission text no longer says «правый ⌥» (the default key is Fn).
+- The built-in dictionary test stores hashes of the banned names, not the names.
 
 ## 2026-11-10
 

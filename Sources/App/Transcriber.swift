@@ -25,17 +25,33 @@ final class Transcriber {
     private var loadedEncoder: URL?
     /// True when the loaded model actually runs its encoder on the Neural Engine.
     private(set) var usesNeuralEngine = false
+    /// Called on the main queue when the Neural Engine encoder got attached in the background.
+    var onEncoderAttached: (() -> Void)?
+    private var attaching = false
+    /// Reloaded GPU-only after idle; the Neural Engine encoder is still to be attached.
+    private var encoderPending = false
+
+    /// The Core ML encoder path is passed to whisper.cpp through the environment, so loads must not overlap.
+    private static let loadLock = NSLock()
+    private static func open(_ url: URL, encoder: URL?, verbose: Bool) -> OpaquePointer? {
+        loadLock.lock(); defer { loadLock.unlock() }
+        let vad = Bundle.main.url(forResource: "ggml-silero-v6.2.0", withExtension: "vad")?.path
+        setenv("JTM_COREML_ENCODER", encoder?.path ?? "", 1)
+        return vf_load(url.path, vad, verbose)
+    }
 
     /// Synchronous (re)load (call off the main thread unless in CLI mode).
     func loadSync(_ url: URL, encoder: URL? = nil, verbose: Bool = false) -> Bool {
+        encoderURL = encoder
+        return open(url, encoder: encoder, verbose: verbose)
+    }
+
+    private func open(_ url: URL, encoder: URL?, verbose: Bool = false) -> Bool {
         if loadedURL == url, loadedEncoder == encoder, ctx != nil { return true }
         if let c = ctx { vf_free(c); ctx = nil }
-        let vad = Bundle.main.url(forResource: "ggml-silero-v6.2.0", withExtension: "vad")?.path
-        setenv("JTM_COREML_ENCODER", encoder?.path ?? "", 1)
-        ctx = vf_load(url.path, vad, verbose)
+        ctx = Self.open(url, encoder: encoder, verbose: verbose)
         loadedURL = ctx != nil ? url : nil
         loadedEncoder = encoder
-        encoderURL = encoder
         usesNeuralEngine = ctx.map { vf_uses_coreml($0) != 0 } ?? false
         lastUse = Date()
         return ctx != nil
@@ -48,12 +64,66 @@ final class Transcriber {
     /// Start loading a temporarily unloaded model now (e.g. when recording starts), so it is ready by the time speech ends.
     func prewarm() {
         idleWork?.cancel()
+        queue.async { self.reloadIfUnloaded() }
+    }
+
+    /// Whether the model is in memory right now (false after an idle unload).
+    var isInMemory: Bool { queue.sync { ctx != nil } }
+
+    /// On the inference queue. GPU only first: that takes under a second, hidden behind the speech.
+    /// The Neural Engine encoder takes seconds to load and its first run is slow, so it is attached
+    /// after the dictation (`attachEncoderIfNeeded`) and swapped in between dictations.
+    private func reloadIfUnloaded() {
+        guard ctx == nil, let u = loadedURL else { return }
+        let t0 = Date()
+        _ = open(u, encoder: nil)
+        encoderPending = encoderURL != nil
+        NSLog("JustTellMe: model reloaded in %.2fs", Date().timeIntervalSince(t0))
+    }
+
+    /// Call when a dictation is done: start attaching the Neural Engine encoder if a reload left it out.
+    /// Not earlier, so loading it does not compete with the dictation itself.
+    func attachEncoderIfNeeded() {
         queue.async {
-            guard self.ctx == nil, let u = self.loadedURL else { return }
-            let t0 = Date()
-            _ = self.loadSync(u, encoder: self.encoderURL)
-            NSLog("JustTellMe: model reloaded in %.2fs", Date().timeIntervalSince(t0))
+            guard self.encoderPending, self.ctx != nil, let u = self.loadedURL, let enc = self.encoderURL else { return }
+            self.encoderPending = false
+            self.attachEncoder(u, enc)
         }
+    }
+
+    private func attachEncoder(_ url: URL, _ enc: URL) {
+        guard !attaching else { return }
+        attaching = true
+        DispatchQueue.global(qos: .utility).async {
+            let t0 = Date()
+            let c = Self.open(url, encoder: enc, verbose: false)
+            if let c { vf_warmup(c, Int32(self.threads)) }
+            self.queue.async {
+                self.attaching = false
+                guard let c else { return }
+                // Something changed meanwhile (other model, unloaded again, already attached): drop it.
+                guard self.ctx != nil, self.loadedURL == url, self.encoderURL == enc, self.loadedEncoder != enc else { vf_free(c); return }
+                vf_free(self.ctx!)
+                self.ctx = c
+                self.loadedEncoder = enc
+                self.usesNeuralEngine = vf_uses_coreml(c) != 0
+                NSLog("JustTellMe: Neural Engine encoder attached in %.2fs", Date().timeIntervalSince(t0))
+                DispatchQueue.main.async { self.onEncoderAttached?() }
+            }
+        }
+    }
+
+    /// Wait until queued work (including a background encoder swap) is done. CLI/tests only.
+    func drain() { queue.sync {} }
+
+    /// Free the model now (it stays chosen and reloads on next use).
+    func unload() { queue.async { self.free() } }
+
+    /// On the inference queue.
+    private func free() {
+        guard let c = ctx else { return }
+        vf_free(c)
+        ctx = nil
     }
 
     /// (Re)arm the idle timer; call on the main queue after each use.
@@ -62,9 +132,8 @@ final class Transcriber {
         guard let after = idleUnload, after > 0 else { return }
         let work = DispatchWorkItem { [weak self] in
             self?.queue.async {
-                guard let self, let c = self.ctx, Date().timeIntervalSince(self.lastUse) >= after - 1 else { return }
-                vf_free(c)
-                self.ctx = nil
+                guard let self, self.ctx != nil, Date().timeIntervalSince(self.lastUse) >= after - 1 else { return }
+                self.free()
                 NSLog("JustTellMe: model unloaded after idle")
             }
         }
@@ -104,7 +173,7 @@ final class Transcriber {
     func transcribe(_ samples: [Float], setup: @escaping () -> (language: String, prompt: String?),
                     onQueue: ((Result) -> Void)? = nil, completion: @escaping (Result) -> Void) {
         queue.async {
-            if self.ctx == nil, let u = self.loadedURL { _ = self.loadSync(u, encoder: self.encoderURL) }
+            self.reloadIfUnloaded()
             let (language, prompt) = setup()
             let r = self.transcribeSync(samples, language: language, prompt: prompt)
             self.lastUse = Date()

@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # JustTellMe — Agent & Contributor Guide
@@ -35,8 +35,9 @@ including Russian speech with English terms. It lives in the menu bar and has on
 |---|---|
 | Build app + zip | `./build.sh` (→ `dist/JustTellMe.app`, `dist/JustTellMe.zip`) |
 | Build app only | `SKIP_ZIP=1 ./build.sh` |
-| Test (all, ~35 s) | `scripts/test.sh` (needs one `./build.sh` first) |
-| Test (fast, ~9 s) | `JTM_SKIP_SLOW=1 scripts/test.sh` (skips the two speech-recognition tests) |
+| Test (all, ~3 min) | `scripts/test.sh` (needs one `./build.sh` first) |
+| Test (fast, ~25 s with compiling) | `JTM_SKIP_SLOW=1 scripts/test.sh` (skips speech recognition and update-archive tests) |
+| Release | `scripts/release.sh` after bumping `CFBundleShortVersionString` in `Resources/Info.plist` and the CHANGELOG (see [devops/](devops/index.md#release)) |
 | Run from the build | `open dist/JustTellMe.app` |
 | Logs of a running build | run `dist/JustTellMe.app/Contents/MacOS/JustTellMe 2> /tmp/jtm.log` directly. `NSLog` from the app does not show up in `log show`. |
 | Lint / typecheck | none beyond `swiftc` (the build fails on type errors) |
@@ -46,7 +47,10 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--stream file.wav` plays the file in real time through the streaming path and prints the wait after "release"
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
-- `--demo-overlay [out.png]` and `--demo-window out-prefix` render the overlay or every page of the main window to PNG
+- `--demo-overlay [out.png]`, `--demo-window out-prefix` and `--demo-card out.png` render the overlay, every page of the main window or the «Курсор не в поле ввода?» card to PNG
+- `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings
+- `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
+- `--update-check`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app` drive the updater
 
 `JTM_SUPPORT_DIR=/some/dir` makes the app use another data folder (the tests rely on this).
 
@@ -76,3 +80,5 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - **8 GB Macs:** with Neural Engine on, expect about 1 GB more memory. The GPU path slows down 2–3× when Chrome or VS Code keep the GPU busy.
 - **Screen capture of our windows** needs Screen Recording permission for the terminal. Use `--demo-window` to check layouts instead.
 - `Paths.support` is a `static let`: set `JTM_SUPPORT_DIR` before anything touches `Paths`.
+- **Releases must be signed with «JustTellMe Local Signing».** The updater refuses a build signed with another certificate, so a release built on a machine without it cannot update existing installs.
+- **Don't cut pauses inside a clip** before recognition: it makes whisper loop on the last phrase ([ADR 008](architecture/decisions/008-keep-pauses-inside-a-clip.md)).

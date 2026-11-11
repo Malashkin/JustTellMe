@@ -50,6 +50,20 @@ final class Paster: NSObject, NSPasteboardItemDataProvider {
         if Prefs.restoreClipboard { scheduleRestore(after: 2.0) }
     }
 
+    /// After a sentence end, add a space so the next dictation does not stick to it.
+    static func withTrailingSpace(_ text: String) -> String {
+        if let last = text.last, ".!?…".contains(last) { return text + " " }
+        return text
+    }
+
+    /// Paste once the user has let go of the modifiers of the shortcut that triggered it (⌃⌥V):
+    /// while they are held, the target app would receive ⌃⌥⌘V instead of ⌘V.
+    func insertWhenModifiersReleased(_ text: String, deadline: Date = Date().addingTimeInterval(1.5)) {
+        let held = CGEventSource.flagsState(.combinedSessionState).intersection([.maskControl, .maskAlternate, .maskShift, .maskCommand])
+        if held.isEmpty || Date() > deadline { insert(text); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { self.insertWhenModifiersReleased(text, deadline: deadline) }
+    }
+
     private func pressCmdV() {
         let src = CGEventSource(stateID: .combinedSessionState)
         let vDown = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true)

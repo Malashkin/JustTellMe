@@ -3,6 +3,7 @@ import Foundation
 // Test entry point (replaces Sources/App/main.swift in the test build).
 let started = Date()
 UnitTests.run()
+FeatureTests.run()
 IntegrationTests.run()
 
 print("")

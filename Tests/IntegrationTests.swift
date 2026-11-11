@@ -146,7 +146,21 @@ enum IntegrationTests {
             T.ok(out.contains("active: ") && !out.contains("active: none"), "output: \(out)")
         }
         if ProcessInfo.processInfo.environment["JTM_SKIP_SLOW"] == "1" {
-            return T.skip("binary: speech recognition", "JTM_SKIP_SLOW=1")
+            return T.skip("binary: speech recognition and update archives", "JTM_SKIP_SLOW=1")
+        }
+        updateStaging(bin)
+        T.test("binary: after an idle unload the model reloads in about a second and gives the same text") {
+            let wav = try tts("Milena", "Давай созвонимся завтра в десять утра и обсудим релиз.")
+            let r = try run(bin, ["--unload-cycle", wav.path], timeout: 180)
+            T.eq(r.status, 0, r.err)
+            func value(_ key: String) -> String {
+                r.out.split(separator: "\n").first { $0.hasPrefix(key) }.map { String($0.dropFirst(key.count)).trimmingCharacters(in: .whitespaces) } ?? ""
+            }
+            T.eq(value("in memory after unload:"), "false", "the model must really leave memory")
+            let reload = Double(value("reload:").split(separator: "s").first ?? "") ?? 99
+            T.ok(reload < 2, "reload took \(reload)s; it has to fit inside the time the user is speaking")
+            T.ok(!value("first:").isEmpty && value("first:") == value("second:"), "first «\(value("first:"))», second «\(value("second:"))»")
+            print("  (reload after idle: \(reload)s)")
         }
         T.test("binary: Russian speech with English terms is recognised, terms stay in Latin") {
             let wav = try tts("Milena", "Привет! Посмотри, пожалуйста, мой pull request до пятницы.")
@@ -169,6 +183,66 @@ enum IntegrationTests {
             T.ok(nums[1] < 15, "ready \(nums[1])s after release — far slower than the ~1–3 s target")
             T.ok(r.out.lowercased().contains("диктовк"), "text: \(r.out)")
             print("  (stream: \(Int(nums[0])) piece(s) early, ready \(nums[1])s after release)")
+        }
+    }
+
+    // MARK: Update archives (what the updater accepts and what it refuses)
+
+    static func updateStaging(_ bin: String) {
+        let app = URL(fileURLWithPath: bin).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        guard app.pathExtension == "app",
+              let version = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String
+        else { return T.skip("update archives", "JTM_APP_BIN is not inside an .app") }
+        let work = support.appendingPathComponent("update-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: work) }
+        func zip(_ appDir: URL, _ name: String) throws -> URL {
+            let z = work.appendingPathComponent(name)
+            _ = try run("/usr/bin/ditto", ["-c", "-k", "--keepParent", appDir.path, z.path], timeout: 120)
+            return z
+        }
+        func copy() throws -> URL {
+            let dir = work.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let c = dir.appendingPathComponent("JustTellMe.app")
+            _ = try run("/usr/bin/ditto", [app.path, c.path], timeout: 120)
+            return c
+        }
+
+        let good = try? zip(app, "good.zip")
+        T.test("update: the release archive of this very build is accepted") {
+            guard let z = good else { return T.fail("could not zip the app") }
+            let r = try run(bin, ["--update-stage", z.path, "--version", version], timeout: 120)
+            T.eq(r.status, 0, r.out + r.err)
+            T.ok(r.out.hasPrefix("ok: "), r.out)
+        }
+        T.test("update: an archive with another version than the release says is refused") {
+            guard let z = good else { return T.fail("could not zip the app") }
+            let r = try run(bin, ["--update-stage", z.path, "--version", "99.0.0"], timeout: 120)
+            T.ok(r.status != 0 && r.out.contains("вместо 99.0.0"), r.out)
+        }
+        T.test("update: an app changed after signing is refused") {
+            let c = try copy()
+            let f = c.appendingPathComponent("Contents/Resources/builtin_terms.txt")
+            let h = try FileHandle(forWritingTo: f); h.seekToEndOfFile(); h.write(Data("\nevil\n".utf8)); try h.close()
+            let r = try run(bin, ["--update-stage", try zip(c, "tampered.zip").path], timeout: 120)
+            T.ok(r.status != 0 && r.out.contains("подпись"), r.out)
+        }
+        T.test("update: a build signed by someone else is refused") {
+            guard let req = Updater.designatedRequirement(of: app), !req.contains("cdhash") else {
+                return T.skip("update: other certificate", "this build is ad-hoc signed, nothing to compare")
+            }
+            let c = try copy()
+            _ = try run("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", c.path], timeout: 120)
+            let r = try run(bin, ["--update-stage", try zip(c, "adhoc.zip").path], timeout: 120)
+            T.ok(r.status != 0 && r.out.contains("другим сертификатом"), r.out)
+        }
+        T.test("update: a zip with something else inside is refused") {
+            let dir = work.appendingPathComponent("junk/JustTellMe.app/Contents")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try "<plist><dict><key>CFBundleIdentifier</key><string>com.evil</string></dict></plist>".write(to: dir.appendingPathComponent("Info.plist"), atomically: true, encoding: .utf8)
+            let r = try run(bin, ["--update-stage", try zip(dir.deletingLastPathComponent(), "junk.zip").path], timeout: 60)
+            T.ok(r.status != 0 && r.out.contains("другое приложение"), r.out)
         }
     }
 

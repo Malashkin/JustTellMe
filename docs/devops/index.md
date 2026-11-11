@@ -1,7 +1,7 @@
 ---
 audience: devops
 owner: Malashkin
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # Build & release
@@ -36,7 +36,20 @@ Run `scripts/make-signing-identity.sh` once. It creates a self-signed "JustTellM
 keychain. With it, macOS keeps the Accessibility and Microphone grants across rebuilds. Without it, `build.sh` signs
 ad-hoc, and you need to re-grant Accessibility after every build. Override the identity with `SIGN_ID=...`.
 
-## Install / update
+## Release
+
+1. Bump `CFBundleShortVersionString` (and `CFBundleVersion`) in `Resources/Info.plist`.
+2. Move the `[Unreleased]` entries in `docs/CHANGELOG.md` under `## [X.Y.Z] — date`.
+3. Commit and push, then run `scripts/release.sh`. It:
+   - refuses if the tree is dirty, not pushed, or the tag exists;
+   - builds with the zip, runs the full test suite;
+   - tags `vX.Y.Z` and creates the GitHub Release with `dist/JustTellMe.zip` and that CHANGELOG section as notes.
+
+Installed apps see the release within a day (or at once with «Проверить сейчас»). They install it themselves: see
+[ADR 007](../architecture/decisions/007-updates-from-github-releases.md). Build releases only on the machine that has
+the «JustTellMe Local Signing» certificate.
+
+## Install / update by hand
 
 ```bash
 osascript -e 'quit app "JustTellMe"'
@@ -50,5 +63,6 @@ After an update:
 
 ## Another Mac
 
-Copy `dist/JustTellMe.zip`, unzip it into Applications, then right-click → Open. The app is not notarized.
-Then grant Microphone and Accessibility.
+Download `JustTellMe.zip` from [Releases](https://github.com/Malashkin/JustTellMe/releases/latest), unzip it into
+Applications, then right-click → Open (the app is not notarized, so the first launch needs this once).
+Then grant Microphone and Accessibility. Later versions install from the app itself.

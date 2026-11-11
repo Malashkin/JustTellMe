@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # Privacy & security
@@ -10,11 +10,19 @@ What JustTellMe keeps, where, and which permissions it needs. Up: [AGENTS.md](..
 
 ## Nothing leaves the Mac
 
-Recognition runs locally (whisper.cpp). The app only goes to the network when you ask it to download something:
-- a model, from `huggingface.co/ggerganov/whisper.cpp`;
-- the Neural Engine encoder, from the same place.
+Recognition runs locally (whisper.cpp). The app goes to the network only for:
+- a model or the Neural Engine encoder you chose to download, from `huggingface.co/ggerganov/whisper.cpp`;
+- the update check, at most once a day: `GET api.github.com/repos/Malashkin/JustTellMe/releases/latest` with
+  `User-Agent: JustTellMe/<version>`. Nothing else is sent. Turn it off in Настройки → Обновления (`checkUpdates`);
+- downloading an update, after you click «Установить».
 
-No telemetry, no accounts.
+No telemetry, no accounts. Audio and text never leave the Mac.
+
+## Updates
+
+An update is installed only if the downloaded app has the same bundle id, the version the release says, an intact
+signature (`codesign --verify --deep --strict`) and the same signing certificate as the installed app. Otherwise
+it is refused with the reason. See [ADR 007](../architecture/decisions/007-updates-from-github-releases.md).
 
 ## Data on disk
 
@@ -34,8 +42,10 @@ Settings are in `UserDefaults` (`com.justtellme.app`). Logs contain timings and 
 | Permission | Why |
 |---|---|
 | Microphone | Recording while you dictate |
-| Accessibility | Listening for the dictation key (listen-only event tap) and sending ⌘V to paste |
+| Accessibility | Listening for the dictation key (listen-only event tap), sending ⌘V to paste, and asking the frontmost app for the **role** of its focused element after pasting (to show «Курсор не в поле ввода?»). The content of fields is never read. |
 | Login Items (optional) | Launch at login |
+
+⌃⌥V (paste again) is a Carbon hotkey and needs no permission.
 
 **Secure input:** while a password field (or Terminal's Secure Keyboard Entry) holds secure input, key presses don't reach us. Dictation still works, but Esc doesn't. The menu shows a warning naming the app that holds it.
 

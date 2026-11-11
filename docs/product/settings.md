@@ -1,7 +1,7 @@
 ---
 audience: product
 owner: Malashkin
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # Settings
@@ -17,11 +17,12 @@ Values are stored in `UserDefaults` (domain `com.justtellme.app`). Read them wit
 | Microphone | `micUID` | system default | CoreAudio device UID. Falls back to the system mic if that device is unplugged. |
 | Model | `modelPath` | bundled large-v3-turbo | |
 | Neural Engine | `neuralEngine` | off | Downloads `<model>-encoder.mlmodelc` into `Models/` |
-| Unload model after idle | `unloadAfterMinutes` | `0` (never) | 5, 15 or 60 minutes. The first dictation after an unload is slower. |
+| Unload model after idle | `unloadAfterMinutes` | `15` | `0` = never (keeps ~0.7 GB in memory), 5, 15 or 60 minutes. The model reloads on the GPU as soon as the key is pressed (under 1 s). |
 | Start/stop sounds | `sounds` | on | System sounds Tink / Pop |
 | Mute speakers while dictating | `muteWhileRecording` | off | Never unmutes speakers you had muted yourself |
 | Restore clipboard | `restoreClipboard` | on | |
 | Built-in dictionary | `builtinDictionary` | on | |
 | Launch at login | (SMAppService) | off | May need approval in System Settings → Login Items |
+| Check for updates daily | `checkUpdates` | on | Asks api.github.com for the latest release; `lastUpdateCheck` holds the time of the last check |
 
 Internal keys: `statsPeriod` (last period chosen on Статистика) and `welcomeShown` (whether the window has opened on first launch).

@@ -152,6 +152,97 @@ if let out = opt("--demo-window") {
     app.run()
 }
 
+//   JustTellMe --unload-cycle file.wav [--encoder x-encoder.mlmodelc]
+//   (idle unload → reload as on a key press: how long the reload takes, whether the text is the same,
+//    whether the Neural Engine encoder gets attached again in the background)
+if let file = opt("--unload-cycle") {
+    guard let m = ModelManager.active(), let audio = try? AudioUtil.loadFile(URL(fileURLWithPath: file)) else { log("ERROR: model or audio"); exit(2) }
+    let enc = opt("--encoder").map { URL(fileURLWithPath: $0) }
+    let t = Transcriber()
+    guard t.loadSync(m.url, encoder: enc) else { exit(2) }
+    let first = t.transcribeSync(audio, language: "auto", prompt: nil).text
+    print("first: \(first)")
+    print("neural engine before unload: \(t.usesNeuralEngine)")
+    t.unload()
+    print("in memory after unload: \(t.isInMemory)")
+    let t0 = Date()
+    t.prewarm()
+    t.drain()
+    print(String(format: "reload: %.2fs, neural engine right after reload: %@", Date().timeIntervalSince(t0), t.usesNeuralEngine ? "true" : "false"))
+    let sem = DispatchSemaphore(value: 0)
+    var second = ""
+    t.transcribe(audio, setup: { ("auto", nil) }, onQueue: { second = $0.text; sem.signal() }, completion: { _ in })
+    sem.wait()
+    print("second: \(second)")
+    print(String(format: "ready after key press: %.2fs", Date().timeIntervalSince(t0)))
+    if enc != nil {
+        print("neural engine during the first dictation: \(t.usesNeuralEngine)")
+        t.attachEncoderIfNeeded()
+        let deadline = Date().addingTimeInterval(60)
+        while !t.usesNeuralEngine && Date() < deadline { Thread.sleep(forTimeInterval: 0.2); t.drain() }
+        print(String(format: "neural engine attached: %@ after %.1fs", t.usesNeuralEngine ? "true" : "false", Date().timeIntervalSince(t0)))
+        let t1 = Date()
+        let third = t.transcribeSync(audio, language: "auto", prompt: nil)
+        print(String(format: "third: %.2fs %@", Date().timeIntervalSince(t1), third.text))
+    }
+    exit(0)
+}
+
+//   JustTellMe --focus-check [seconds]   (after the delay: is a text field focused in the frontmost app?)
+if args.contains("--focus-check") {
+    Thread.sleep(forTimeInterval: Double(opt("--focus-check") ?? "0") ?? 0)
+    let front = NSWorkspace.shared.frontmostApplication
+    print("\(front?.bundleIdentifier ?? "?"): \(FocusedField.current(in: front)) (trusted: \(AXIsProcessTrusted()))")
+    exit(0)
+}
+
+//   JustTellMe --demo-card out.png   (renders the «Курсор не в поле ввода?» card)
+if let out = opt("--demo-card") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    app.appearance = NSAppearance(named: .aqua)
+    let c = NoFieldCard()
+    c.show("Созвон перенесли на четверг, в 15:00. Захвати, пожалуйста, ноутбук и отчёт по продажам за октябрь.")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
+    app.run()
+}
+
+//   JustTellMe --update-check            (latest GitHub release vs this build)
+//   JustTellMe --update-stage file.zip [--version X]   (unpack and verify a release zip like the updater does)
+//   JustTellMe --update-install target.app   (full update of another copy of the app, without relaunching it)
+if args.contains("--update-check") {
+    Updater.fetchLatest { r in
+        switch r {
+        case .success(let rel?):
+            print("latest: \(rel.version) zip: \(rel.zip?.absoluteString ?? "none") size: \(rel.size)")
+            print("this build: \(Updater.currentVersion), newer available: \(Updater.isNewer(rel.version, than: Updater.currentVersion))")
+        case .success(nil): print("no releases")
+        case .failure(let e): print("error: \(e.localizedDescription)"); exit(1)
+        }
+        exit(0)
+    }
+    RunLoop.main.run()
+}
+if let zip = opt("--update-stage") {
+    do { print("ok: \(try Updater.stage(zip: URL(fileURLWithPath: zip), expectVersion: opt("--version")).path)"); exit(0) }
+    catch { print("rejected: \(error.localizedDescription)"); exit(1) }
+}
+if let target = opt("--update-install") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let u = Updater()
+    Updater.fetchLatest { r in
+        guard case .success(let rel?) = r else { print("error: no release"); exit(1) }
+        var last = -1
+        u.onChange = { if case .downloading(_, let p) = u.state, Int(p * 10) != last { last = Int(p * 10); log("download \(last * 10)%") } }
+        u.install(rel, target: URL(fileURLWithPath: target), relaunch: false) { err in
+            print(err.map { "error: \($0.localizedDescription)" } ?? "installed \(rel.version)")
+            exit(err == nil ? 0 : 1)
+        }
+    }
+    app.run()
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

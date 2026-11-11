@@ -165,6 +165,8 @@ int vf_transcribe(vf_ctx *ctx, const float *samples, int n_samples,
             int b = (int)(whisper_vad_segments_get_segment_t1(seg, ns - 1) * 160.0f) + 16000 * 3 / 10; // +300 ms
             if (a < 0) a = 0;
             if (b > n_samples) b = n_samples;
+            // Pauses inside are kept on purpose: cutting them out made whisper loop on the last phrase
+            // and fall back to temperature sampling (3x slower, sometimes garbage) on some clips.
             if (b - a >= 16000 / 2) {
                 if (g_verbose) fprintf(stderr, "vf: VAD: %d segment(s), trim %.2f..%.2f of %.2fs\n",
                                        ns, a / 16000.0, b / 16000.0, n_samples / 16000.0);
@@ -202,4 +204,15 @@ int vf_transcribe(vf_ctx *ctx, const float *samples, int n_samples,
         rc = run_full(w, samples, n_samples, lang, prompt, n_threads, 0, out, out_size);
     }
     return rc;
+}
+
+void vf_warmup(vf_ctx *ctx, int n_threads) {
+    if (!ctx) return;
+    // One encoder + decoder pass on a second of quiet noise (no VAD: it would skip silence).
+    float *buf = (float *)malloc(17600 * sizeof(float));
+    unsigned r = 12345;
+    for (int i = 0; i < 17600; i++) { r = r * 1103515245u + 12345u; buf[i] = ((int)(r >> 16 & 0x7fff) - 16384) / 16384.0f * 0.001f; }
+    char out[256];
+    run_full(ctx->w, buf, 17600, "en", NULL, n_threads, 0, out, sizeof(out));
+    free(buf);
 }

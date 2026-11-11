@@ -8,6 +8,8 @@ struct AppStatus: Equatable {
     var modelReady = false
     var conflictingApp: String?
     var fnSwitchesInput = false
+    /// A newer version is available on GitHub.
+    var update: String?
 }
 
 /// The app's only window: a sidebar with Главная (feed + quick stats), Статистика, Словарь, Настройки.
@@ -182,6 +184,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     var onOpenMic: (() -> Void)?
     var onOpenStats: (() -> Void)?
     var onFix: ((String) -> Void)?
+    var onInstallUpdate: (() -> Void)?
 
     private(set) lazy var view: NSView = build()
     private let hint = NSTextField(wrappingLabelWithString: "")
@@ -296,11 +299,12 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
                        "в «Настройки → Клавиатура» выберите «Нажатие 🌐: Ничего не делать» или смените клавишу в настройках JustTellMe",
                        ("Настройки клавиатуры…", #selector(keyboardAction)))
         }
+        if let v = s.update { addProblem("Доступна версия \(v)", "обновление ставится в пару кликов, разрешения сохранятся", ("Установить…", #selector(updateAction)), ok: true, mark: "⬆️") }
         problems.isHidden = problems.arrangedSubviews.isEmpty
     }
 
-    private func addProblem(_ title: String, _ detail: String, _ button: (String, Selector)?, ok: Bool = false) {
-        let mark = NSTextField(labelWithString: ok ? "⏳" : "⚠️")
+    private func addProblem(_ title: String, _ detail: String, _ button: (String, Selector)?, ok: Bool = false, mark: String? = nil) {
+        let mark = NSTextField(labelWithString: mark ?? (ok ? "⏳" : "⚠️"))
         let t = label(title, bold: true)
         let d = label(detail)
         d.textColor = .secondaryLabelColor
@@ -324,6 +328,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
     }
     @objc private func statsAction() { onOpenStats?() }
+    @objc private func updateAction() { onInstallUpdate?() }
 
     // MARK: feed
 

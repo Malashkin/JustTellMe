@@ -16,6 +16,8 @@ protocol SettingsHost: AnyObject {
     func applyUnloadPref()
     var launchAtLogin: Bool { get }
     func toggleLogin()
+    var updateStatusText: String { get }
+    func checkForUpdatesNow()
 }
 
 /// "Настройки" page of the main window. Mirrors the Настройки submenu of the menu-bar icon.
@@ -36,9 +38,12 @@ final class SettingsPane: NSObject {
     private let muteBox = NSButton(checkboxWithTitle: "Приглушать звук компьютера во время диктовки", target: nil, action: nil)
     private let clipBox = NSButton(checkboxWithTitle: "Возвращать прежний буфер обмена после вставки", target: nil, action: nil)
     private let loginBox = NSButton(checkboxWithTitle: "Запускать JustTellMe при входе в систему", target: nil, action: nil)
+    private let updatesBox = NSButton(checkboxWithTitle: "Проверять обновления раз в день", target: nil, action: nil)
+    private let checkNow = NSButton(title: "Проверить сейчас", target: nil, action: nil)
+    private let updateStatus = NSTextField(labelWithString: "")
 
     private static let languages = [("auto", "Авто (ru/en, с уклоном в ru)"), ("ru", "Русский"), ("en", "English")]
-    private static let unloadOptions = [(0, "Никогда (самый быстрый ответ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя"), (60, "Через час простоя")]
+    static let unloadOptions = [(0, "Никогда (держать в памяти ~0,7 ГБ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя (рекомендуется)"), (60, "Через час простоя")]
 
     private func build() -> NSView {
         for (p, sel) in [(keyPopup, #selector(keyChanged)), (triggerPopup, #selector(triggerChanged)), (langPopup, #selector(langChanged)),
@@ -47,7 +52,8 @@ final class SettingsPane: NSObject {
             p.action = sel
         }
         for (b, sel) in [(neuralBox, #selector(neuralChanged)), (neuralRetry, #selector(retryNeural)), (soundsBox, #selector(soundsChanged)),
-                         (muteBox, #selector(muteChanged)), (clipBox, #selector(clipChanged)), (loginBox, #selector(loginChanged))] {
+                         (muteBox, #selector(muteChanged)), (clipBox, #selector(clipChanged)), (loginBox, #selector(loginChanged)),
+                         (updatesBox, #selector(updatesChanged)), (checkNow, #selector(checkUpdates))] {
             b.target = self
             b.action = sel
         }
@@ -71,17 +77,22 @@ final class SettingsPane: NSObject {
             [caption("Ускорение"), NSStackView(views: [neuralBox, neuralRetry])],
             [NSGridCell.emptyContentView, neuralStatus],
             [caption("Выгружать модель из памяти"), unloadPopup],
-            [NSGridCell.emptyContentView, note("После выгрузки первая диктовка чуть дольше.")],
+            [NSGridCell.emptyContentView, note("Модель загружается заново, пока вы говорите: на видеокарте это меньше секунды.")],
             [caption("Звук и вставка"), soundsBox],
             [NSGridCell.emptyContentView, muteBox],
             [NSGridCell.emptyContentView, clipBox],
+            [NSGridCell.emptyContentView, note("⌃⌥V — вставить последнее надиктованное ещё раз.")],
             [caption("Запуск"), loginBox],
+            [caption("Обновления"), NSStackView(views: [updatesBox, checkNow])],
+            [NSGridCell.emptyContentView, updateStatus],
         ])
         grid.rowSpacing = 10
         grid.columnSpacing = 14
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .firstBaseline
-        for i in [2, 6, 8, 10] { grid.row(at: i).topPadding = -6 }
+        for i in [2, 6, 8, 10, 14, 17] { grid.row(at: i).topPadding = -6 }
+        updateStatus.font = .systemFont(ofSize: 11)
+        updateStatus.textColor = .secondaryLabelColor
         neuralStatus.preferredMaxLayoutWidth = 440
 
         let stack = NSStackView(views: [grid])
@@ -153,6 +164,8 @@ final class SettingsPane: NSObject {
         muteBox.state = Prefs.muteWhileRecording ? .on : .off
         clipBox.state = Prefs.restoreClipboard ? .on : .off
         loginBox.state = host?.launchAtLogin == true ? .on : .off
+        updatesBox.state = Prefs.checkUpdates ? .on : .off
+        updateStatus.stringValue = host?.updateStatusText ?? "Установлена версия \(Updater.currentVersion)."
     }
 
     @objc private func keyChanged() { host?.setHotkey(PushToTalkHotkey.Key.allCases[keyPopup.indexOfSelectedItem]) }
@@ -174,4 +187,6 @@ final class SettingsPane: NSObject {
     @objc private func muteChanged() { Prefs.muteWhileRecording = muteBox.state == .on }
     @objc private func clipChanged() { Prefs.restoreClipboard = clipBox.state == .on }
     @objc private func loginChanged() { host?.toggleLogin(); reload() }
+    @objc private func updatesChanged() { Prefs.checkUpdates = updatesBox.state == .on }
+    @objc private func checkUpdates() { host?.checkForUpdatesNow(); reload() }
 }

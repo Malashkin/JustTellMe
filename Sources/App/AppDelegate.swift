@@ -1,4 +1,5 @@
 import AVFoundation
+import Carbon
 import Cocoa
 import ServiceManagement
 
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var langItems: [String: NSMenuItem] = [:]
     private let secureItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let settingsRoot = NSMenuItem(title: "Настройки", action: nil, keyEquivalent: "")
+    private let updateItem = NSMenuItem(title: "", action: #selector(updateClicked), keyEquivalent: "")
 
     private let transcriber = Transcriber()
     private let recorder = Recorder()
@@ -29,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let models = ModelManager()
     private let neural = NeuralEngine()
     private let fixWindow = CorrectionWindow()
+    private let noFieldCard = NoFieldCard()
+    let updater = Updater()
+    private var repasteShortcut: GlobalShortcut?
     private var state: State = .loading
     private var recordStart = Date()
     private var permTimer: Timer?
@@ -63,6 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.onCombo = { [weak self] in self?.cancelRecording() }
         hotkey.onEscape = { [weak self] in self?.escapePressed() }
         applyUnloadPref()
+        transcriber.onEncoderAttached = { [weak self] in self?.rebuildModelMenu(); self?.main.refresh() }
+        repasteShortcut = GlobalShortcut(keyCode: kVK_ANSI_V, modifiers: controlKey | optionKey) { [weak self] in self?.pasteLastAgain() }
+        if repasteShortcut == nil { NSLog("JustTellMe: ⌃⌥V is taken by another app") }
+
+        updater.onChange = { [weak self] in self?.updateChanged() }
+        updater.canRestart = { [weak self] in
+            switch self?.state { case .recording?, .transcribing?: return false; default: return true }
+        }
+        updater.start()
 
         neural.onChange = { [weak self] in self?.neuralChanged() }
         models.onProgress = { [weak self] _, p in self?.downloadProgress = p; self?.rebuildModelMenu() }
@@ -76,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         main.home.onOpenAccessibility = { [weak self] in self?.openAccessibility() }
         main.home.onOpenMic = { [weak self] in self?.openMicSettings() }
         main.home.onFix = { [weak self] text in self?.fixWindow.open(original: text) }
+        main.home.onInstallUpdate = { [weak self] in self?.updateClicked() }
         main.home.status = { [weak self] in self?.appStatus ?? AppStatus() }
         main.settings.host = self
 
@@ -118,7 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                          accessOK: AXIsProcessTrusted() && hotkey.isInstalled,
                          modelReady: ready,
                          conflictingApp: conflictingApp,
-                         fnSwitchesInput: hotkey.key == .fn && fnHasSystemAction)
+                         fnSwitchesInput: hotkey.key == .fn && fnHasSystemAction,
+                         update: updater.available?.version)
     }
 
     private func loadActiveModel() {
@@ -301,16 +317,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSLog("JustTellMe: [\(r.lang)] %.1fs audio, %d piece(s) sent while speaking, ready %.2fs after release, %d chars",
                   Double(audio.count) / 16_000, early, Date().timeIntervalSince(released), r.text.count)
             self.transcriber.scheduleIdleUnload()
+            self.transcriber.attachEncoderIfNeeded()
             guard myJob == self.job else { return } // cancelled with Esc
             self.setState(.idle)
             guard !r.text.isEmpty else { return }
-            var out = r.text
-            if let last = out.last, ".!?…".contains(last) { out += " " }
             self.lastResult = r.text
             self.updateStatusLine()
-            History.shared.add(text: r.text, lang: r.lang, app: NSWorkspace.shared.frontmostApplication?.localizedName, seconds: Double(audio.count) / 16_000)
-            Paster.shared.insert(out)
+            let front = NSWorkspace.shared.frontmostApplication
+            History.shared.add(text: r.text, lang: r.lang, app: front?.localizedName, seconds: Double(audio.count) / 16_000)
+            Paster.shared.insert(Paster.withTrailingSpace(r.text))
+            self.offerCopyIfNoField(r.text, in: front)
         }
+    }
+
+    /// Pasting went nowhere (no text field focused): show the text with a «Скопировать» button.
+    private func offerCopyIfNoField(_ text: String, in app: NSRunningApplication?) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let f = FocusedField.current(in: app)
+            guard f == .none else { return }
+            NSLog("JustTellMe: no text field focused in %@", app?.localizedName ?? "?")
+            DispatchQueue.main.async { self.noFieldCard.show(text) }
+        }
+    }
+
+    /// ⌃⌥V: paste the last dictation again where the cursor is now (e.g. it went to the wrong field).
+    @objc private func pasteLastAgain() {
+        switch state { case .recording, .transcribing: return; default: break }
+        let text = lastResult.isEmpty ? (History.shared.entries.first?.text ?? "") : lastResult
+        guard !text.isEmpty else { NSSound.beep(); return }
+        Paster.shared.insertWhenModifiersReleased(Paster.withTrailingSpace(text))
     }
 
     private func stopStreaming(cancel: Bool) {
@@ -380,6 +415,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let openItem = NSMenuItem(title: "Открыть JustTellMe…", action: #selector(showMain), keyEquivalent: "o")
         openItem.target = self
         menu.addItem(openItem)
+        updateItem.target = self
+        updateItem.isHidden = true
+        menu.addItem(updateItem)
         menu.addItem(.separator())
 
         let keyRoot = NSMenuItem(title: "Клавиша диктовки", action: nil, keyEquivalent: "")
@@ -420,6 +458,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(builtinItem)
         fixItem.target = self
         menu.addItem(fixItem)
+        let repaste = NSMenuItem(title: "Вставить последнее ещё раз", action: #selector(pasteLastAgain), keyEquivalent: "v")
+        repaste.keyEquivalentModifierMask = [.control, .option]
+        repaste.target = self
+        menu.addItem(repaste)
         let copyLast = NSMenuItem(title: "Скопировать последний текст", action: #selector(copyLast), keyEquivalent: "")
         copyLast.target = self
         menu.addItem(copyLast)
@@ -432,6 +474,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         loginItem.target = self
         menu.addItem(loginItem)
+        let checkItem = NSMenuItem(title: "Проверить обновления…", action: #selector(checkForUpdatesNow), keyEquivalent: "")
+        checkItem.target = self
+        menu.addItem(checkItem)
         menu.addItem(NSMenuItem(title: "Выход", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
         refreshPermissionItems()
@@ -616,14 +661,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let unloadRoot = NSMenuItem(title: "Выгружать модель из памяти", action: nil, keyEquivalent: "")
         let un = NSMenu(); un.autoenablesItems = false
-        for (mins, title) in [(0, "Никогда (самый быстрый ответ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя"), (60, "Через час простоя")] {
+        for (mins, title) in SettingsPane.unloadOptions {
             let it = NSMenuItem(title: title, action: #selector(pickUnload(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = mins
             it.state = Prefs.unloadAfterMinutes == mins ? .on : .off
             un.addItem(it)
         }
-        let note = NSMenuItem(title: "После выгрузки первая диктовка чуть дольше", action: nil, keyEquivalent: "")
+        let note = NSMenuItem(title: "Модель загружается заново, пока вы говорите", action: nil, keyEquivalent: "")
         note.isEnabled = false
         un.addItem(.separator())
         un.addItem(note)
@@ -791,6 +836,93 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSLog("JustTellMe: login item error: \(error)")
         }
         if svc.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+    }
+}
+
+// MARK: - Updates
+
+extension AppDelegate {
+    private func updateChanged() {
+        switch updater.state {
+        case .available(let r):
+            updateItem.title = "⬆︎ Доступна версия \(r.version) — установить…"
+            updateItem.isHidden = false
+            updateItem.isEnabled = true
+        case .downloading(let r, let p):
+            updateItem.title = "⬇︎ Загрузка версии \(r.version): \(Int(p * 100))%"
+            updateItem.isHidden = false
+            updateItem.isEnabled = false
+        case .installing:
+            updateItem.title = "Установка обновления…"
+            updateItem.isHidden = false
+            updateItem.isEnabled = false
+        default:
+            updateItem.isHidden = true
+        }
+        main.refresh()
+    }
+
+    @objc func updateClicked() {
+        guard let r = updater.available, case .available = updater.state else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = "JustTellMe \(r.version)"
+        let notes = r.notes.count > 900 ? String(r.notes.prefix(900)) + "…" : r.notes
+        a.informativeText = "Сейчас установлена версия \(Updater.currentVersion).\n\n\(notes)\n\n"
+            + "Загрузка \(r.size > 0 ? "\(r.size / 1_000_000) МБ" : "архива"), затем JustTellMe перезапустится. Разрешения сохранятся."
+        a.addButton(withTitle: "Установить и перезапустить")
+        a.addButton(withTitle: "Позже")
+        a.addButton(withTitle: "Что нового на GitHub")
+        switch a.runModal() {
+        case .alertFirstButtonReturn:
+            updater.install(r) { [weak self] err in
+                guard let err, let self else { return }
+                NSApp.activate(ignoringOtherApps: true)
+                let e = NSAlert()
+                e.messageText = "Не удалось установить обновление"
+                e.informativeText = err.localizedDescription + "\n\nМожно скачать его вручную со страницы выпуска."
+                e.addButton(withTitle: "Открыть страницу")
+                e.addButton(withTitle: "Закрыть")
+                if e.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(r.page) }
+                self.updater.state = .available(r)
+            }
+        case .alertThirdButtonReturn: NSWorkspace.shared.open(r.page)
+        default: break
+        }
+    }
+
+    @objc func checkForUpdatesNow() {
+        updater.check { [weak self] st in
+            guard let self else { return }
+            switch st {
+            case .available: self.updateClicked()
+            case .upToDate, .failed:
+                NSApp.activate(ignoringOtherApps: true)
+                let a = NSAlert()
+                if case .failed(let e) = st {
+                    a.messageText = "Не удалось проверить обновления"
+                    a.informativeText = e
+                } else {
+                    a.messageText = "Установлена последняя версия"
+                    a.informativeText = "JustTellMe \(Updater.currentVersion)"
+                }
+                a.runModal()
+            default: break
+            }
+        }
+    }
+
+    var updateStatusText: String {
+        let v = "Установлена версия \(Updater.currentVersion)."
+        switch updater.state {
+        case .checking: return v + " Проверка…"
+        case .upToDate: return v + " Это последняя версия."
+        case .available(let r): return v + " Доступна \(r.version)."
+        case .downloading(let r, let p): return v + " Загрузка \(r.version): \(Int(p * 100))%."
+        case .installing: return v + " Установка…"
+        case .failed(let e): return v + " Не удалось проверить: \(e)"
+        case .idle: return v
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+import Carbon
 import Cocoa
 
 /// Global push-to-talk on a single modifier key (Fn/🌐 or Right Option) via a listen-only CGEventTap.
@@ -88,5 +89,37 @@ final class PushToTalkHotkey {
             }
         default: break
         }
+    }
+}
+
+/// A system-wide shortcut through Carbon's RegisterEventHotKey: the key press is consumed (it never
+/// reaches the frontmost app) and no permission is needed. Used for ⌃⌥V «вставить последнее ещё раз».
+final class GlobalShortcut {
+    private var ref: EventHotKeyRef?
+    private static var actions: [UInt32: () -> Void] = [:]
+    private static var handlerInstalled = false
+    private static var nextID: UInt32 = 1
+
+    /// nil if the combination is taken by another app.
+    init?(keyCode: Int, modifiers: Int, action: @escaping () -> Void) {
+        Self.installHandler()
+        let id = Self.nextID
+        Self.nextID += 1
+        let hk = EventHotKeyID(signature: OSType(0x4A_54_4D_53), id: id) // 'JTMS'
+        guard RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hk, GetApplicationEventTarget(), 0, &ref) == noErr else { return nil }
+        Self.actions[id] = action
+    }
+
+    private static func installHandler() {
+        guard !handlerInstalled else { return }
+        handlerInstalled = true
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var hk = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &hk)
+            GlobalShortcut.actions[hk.id]?()
+            return noErr
+        }, 1, &spec, nil, nil)
     }
 }

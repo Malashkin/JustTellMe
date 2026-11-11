@@ -26,6 +26,10 @@ int vf_transcribe(vf_ctx *ctx, const float *samples, int n_samples,
                   const char *language, const char *prompt, int n_threads, bool fast,
                   char *out, int out_size, char *detected_lang);
 
+// Run the model once on a second of near-silence, so the first real dictation is not slowed by
+// one-time setup (the Neural Engine's first run takes seconds).
+void vf_warmup(vf_ctx *ctx, int n_threads);
+
 #ifdef __cplusplus
 }
 #endif
