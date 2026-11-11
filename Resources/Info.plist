@@ -33,6 +33,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>JustTellMe записывает голос, пока вы удерживаете правый ⌥, и распознаёт его локально на этом Mac.</string>
+	<string>JustTellMe записывает голос, пока вы диктуете (удерживаете клавишу диктовки), и распознаёт его локально на этом Mac.</string>
 </dict>
 </plist>

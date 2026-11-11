@@ -1,6 +1,16 @@
 # JustTellMe
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black)
+![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M4-black)
+
+> **Private, offline push-to-talk dictation for macOS.** Hold a key, speak, release — the text is typed into
+> whatever app you are in. Runs entirely on your Mac with whisper.cpp (Metal / Neural Engine): no cloud,
+> no account, no subscription. Tuned for Russian with English terms mixed in, works for English too.
+
 Локальная диктовка для macOS (Apple Silicon): зажмите клавишу (Fn или правый ⌥), говорите, отпустите — текст вставится в активное поле. Распознавание полностью на устройстве через [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (Metal), модель large-v3-turbo встроена в приложение.
+
+Документация: [docs/](docs/AGENTS.md) — продукт, архитектура и решения (ADR), сборка, тесты, приватность, [CHANGELOG](docs/CHANGELOG.md).
 
 ## Возможности
 - Push-to-talk на Fn (🌐) или правом ⌥: удерживайте и говорите; короткое нажатие — диктовка без рук до следующего нажатия; Esc — отмена
@@ -53,3 +63,7 @@ JTM_SKIP_SLOW=1 scripts/test.sh # без двух тестов распозна�
 - `Tests` — тесты (свой мини-харнесс: на машине только Command Line Tools, без XCTest)
 
 Личные данные (история диктовок, личный словарь, замены, скачанные модели) хранятся в `~/Library/Application Support/JustTellMe/` и в репозиторий не попадают.
+
+## Лицензия
+[MIT](LICENSE). Сторонние компоненты: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT),
+модели [Whisper](https://github.com/openai/whisper) (MIT), [Silero VAD](https://github.com/snakers4/silero-vad) (MIT).
