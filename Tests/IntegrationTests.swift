@@ -149,6 +149,13 @@ enum IntegrationTests {
             return T.skip("binary: speech recognition and update archives", "JTM_SKIP_SLOW=1")
         }
         updateStaging(bin)
+        T.test("binary: the idle timer frees the model even if it was used after the timer was armed") {
+            let wav = try tts("Milena", "Проверка выгрузки.")
+            let r = try run(bin, ["--idle-unload", wav.path], timeout: 120)
+            T.eq(r.status, 0, r.err)
+            T.ok(r.out.contains("in memory right after use: true"), r.out)
+            T.ok(r.out.contains("in memory after 4 s idle: false"), "the model stayed in memory: \(r.out)")
+        }
         T.test("binary: after an idle unload the model reloads in about a second and gives the same text") {
             let wav = try tts("Milena", "Давай созвонимся завтра в десять утра и обсудим релиз.")
             let r = try run(bin, ["--unload-cycle", wav.path], timeout: 180)

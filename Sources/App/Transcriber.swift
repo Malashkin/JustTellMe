@@ -126,19 +126,25 @@ final class Transcriber {
         ctx = nil
     }
 
-    /// (Re)arm the idle timer; call on the main queue after each use.
-    func scheduleIdleUnload() {
+    /// (Re)arm the idle timer; call on the main queue after each use. If the model was used (or finished
+    /// loading) after the timer was armed, it re-arms for the rest of the idle time instead of giving up.
+    func scheduleIdleUnload(in delay: TimeInterval? = nil) {
         idleWork?.cancel()
         guard let after = idleUnload, after > 0 else { return }
         let work = DispatchWorkItem { [weak self] in
             self?.queue.async {
-                guard let self, self.ctx != nil, Date().timeIntervalSince(self.lastUse) >= after - 1 else { return }
-                self.free()
-                NSLog("JustTellMe: model unloaded after idle")
+                guard let self, self.ctx != nil else { return }
+                let idle = Date().timeIntervalSince(self.lastUse)
+                if idle >= after - 1 {
+                    self.free()
+                    NSLog("JustTellMe: model unloaded after idle")
+                } else {
+                    DispatchQueue.main.async { self.scheduleIdleUnload(in: after - idle) }
+                }
             }
         }
         idleWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (delay ?? after), execute: work)
     }
 
     struct Result { var text: String; var raw: String; var lang: String; var seconds: Double }

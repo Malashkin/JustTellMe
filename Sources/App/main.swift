@@ -188,6 +188,24 @@ if let file = opt("--unload-cycle") {
     exit(0)
 }
 
+//   JustTellMe --idle-unload file.wav   (idle timer of 2 s, but the model is used 1 s after arming:
+//   it must still be freed once it has really been idle for 2 s)
+if let file = opt("--idle-unload") {
+    guard let m = ModelManager.active(), let audio = try? AudioUtil.loadFile(URL(fileURLWithPath: file)) else { log("ERROR: model or audio"); exit(2) }
+    let t = Transcriber()
+    guard t.loadSync(m.url) else { exit(2) }
+    t.idleUnload = 2
+    t.scheduleIdleUnload()
+    RunLoop.main.run(until: Date().addingTimeInterval(1))
+    var used = false
+    t.transcribe(audio, setup: { ("auto", nil) }, completion: { _ in used = true })
+    while !used { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    print("in memory right after use: \(t.isInMemory)")
+    RunLoop.main.run(until: Date().addingTimeInterval(4))
+    print("in memory after 4 s idle: \(t.isInMemory)")
+    exit(0)
+}
+
 //   JustTellMe --focus-check [seconds]   (after the delay: is a text field focused in the frontmost app?)
 if args.contains("--focus-check") {
     Thread.sleep(forTimeInterval: Double(opt("--focus-check") ?? "0") ?? 0)

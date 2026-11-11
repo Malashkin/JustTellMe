@@ -1,6 +1,6 @@
 # Test Results
 
-**Date:** 2026-11-11 (v1.1.1) · **Status:** 🟢 PASS
+**Date:** 2026-11-11 (v1.1.2) · **Status:** 🟢 PASS
 **Stack:** Swift 5.10 + C shim (whisper.cpp), macOS desktop app, Command Line Tools only (no XCTest)
 **Runner:** `scripts/test.sh` (a test executable built from `Sources/App` + `Tests/`; `JTM_SKIP_SLOW=1` skips speech recognition)
 **Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched.
@@ -10,10 +10,10 @@
 | Unit | 47 (incl. 2 property-based) | ✅ | stats and streak, Russian plural/duration formatting, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
 | Integration (files) | 10 (incl. 1 property-based) | ✅ | history save/delete/clear and JSON round trip, personal dictionary and replacements end to end, save/load from the dictionary page, built-in dictionary (no client names, all rules valid) |
 | Unit, v1.1 features | 20 (incl. 4 property-based) | ✅ | unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
-| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused; a release zip installed over another copy (no hang, no leftovers) |
+| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, the idle timer frees the model even if it was used after being armed, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused; a release zip installed over another copy (no hang, no leftovers) |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 90 passed, 0 failed, 0 skipped, 173 s (fast suite: 81 passed, 3 s).
+**Total:** 91 passed, 0 failed, 0 skipped, 157 s (fast suite: 81 passed, 3 s).
 
 ## Mutation testing
 
@@ -63,6 +63,10 @@ the global hotkey, microphone capture and pasting (they need a real session with
   11 GB. Refused archives are now deleted (1.1.1).
 - Installing over another copy (not the running app) hung: the swap script waited on PID 0, and `kill -0 0` is
   the whole process group. Self-updates were unaffected. Fixed; the new install test timed out before the fix.
+- **The idle unload never happened after launch.** Found by measuring the installed app: still 681 MB after the idle
+  time. The timer fired once and gave up because the model had finished loading after it was armed. It now re-arms
+  for the rest of the time (1.1.2). Test `binary: the idle timer frees the model even if it was used after…` was red
+  before the fix.
 
 ## Not tested
 

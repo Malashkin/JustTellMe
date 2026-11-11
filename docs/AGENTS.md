@@ -48,7 +48,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
 - `--demo-overlay [out.png]`, `--demo-window out-prefix` and `--demo-card out.png` render the overlay, every page of the main window or the «Курсор не в поле ввода?» card to PNG
-- `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings
+- `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings; `--idle-unload file.wav` checks the idle timer
 - `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
 - `--update-check [--page]`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app [--zip file.zip --version X]` drive the updater
 

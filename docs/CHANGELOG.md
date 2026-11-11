@@ -10,7 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-11-11
+
 ### Fixed
+- **The model is really freed after the idle time.** The idle timer fired once and gave up if the model had been used, or had finished loading, after it was armed. Right after launch that is always the case, so the model stayed in memory until the first dictation. It now re-arms for the remaining time.
 - `--update-install` of another copy of the app hung forever: the swap script waited on PID 0 (`kill -0 0` means the whole process group). Self-updates were not affected. A test now installs a local release zip over another copy.
 
 ### Added
