@@ -1,6 +1,6 @@
 # Test Results
 
-**Date:** 2026-11-11 (v1.1.0) · **Status:** 🟢 PASS
+**Date:** 2026-11-11 (v1.1.1) · **Status:** 🟢 PASS
 **Stack:** Swift 5.10 + C shim (whisper.cpp), macOS desktop app, Command Line Tools only (no XCTest)
 **Runner:** `scripts/test.sh` (a test executable built from `Sources/App` + `Tests/`; `JTM_SKIP_SLOW=1` skips speech recognition)
 **Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched.
@@ -9,11 +9,11 @@
 |---|---|---|---|
 | Unit | 47 (incl. 2 property-based) | ✅ | stats and streak, Russian plural/duration formatting, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
 | Integration (files) | 10 (incl. 1 property-based) | ✅ | history save/delete/clear and JSON round trip, personal dictionary and replacements end to end, save/load from the dictionary page, built-in dictionary (no client names, all rules valid) |
-| Unit, v1.1 features | 19 (incl. 4 property-based) | ✅ | unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), waveform bars |
-| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 2.12 s after release**, GPU), **reload after idle unload 0.49 s** with the same text, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused |
+| Unit, v1.1 features | 20 (incl. 4 property-based) | ✅ | unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
+| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 88 passed, 0 failed, 0 skipped, 173 s (fast suite: 80 passed, 3 s).
+**Total:** 89 passed, 0 failed, 0 skipped, 97 s (fast suite: 81 passed, 3 s).
 
 ## Mutation testing
 
@@ -51,6 +51,16 @@ the global hotkey, microphone capture and pasting (they need a real session with
 - Recording pill: CPU for a 6 s demo 0.22 s → 0.09 s, 780 M → 330 M instructions (incl. process start); PNG
   render looks the same.
 - Pause cutting inside clips was measured and rejected (ADR 008).
+- **Real update end to end:** a copy of the app relabelled 1.0.0 (re-signed) found v1.1.0 on GitHub, downloaded
+  JustTellMe.zip (513 MB, 24 s), verified it, replaced itself after quitting and came back as 1.1.0 with a valid
+  signature and no quarantine flag.
+
+## Defects found by this round (fixed)
+
+- The GitHub API answered 403 on the first real check: its 60 requests/hour per IP were used up. The updater now
+  falls back to the `releases/latest` page (1.1.1).
+- Each refused update archive left an unpacked ~550 MB app in the temporary folder; the test runs had piled up
+  11 GB. Refused archives are now deleted (1.1.1).
 
 ## Not tested
 

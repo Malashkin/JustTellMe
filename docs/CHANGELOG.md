@@ -10,6 +10,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-11
+
+### Fixed
+- **Updates are found even when GitHub's API limit is used up.** The API allows 60 requests an hour per IP address, shared by everyone behind it. On 403/429 the app now reads the version from the `releases/latest` page.
+- **A refused update no longer leaves a ~550 MB copy in the temporary folder.**
+
 ## [1.1.0] — 2026-11-11
 
 ### Added

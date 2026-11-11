@@ -156,6 +156,13 @@ enum FeatureTests {
             let r = Updater.parse(release(assets: [["name": "Source.tar.gz", "browser_download_url": "https://x/y"]]))
             T.ok(r != nil && r?.zip == nil, "\(String(describing: r))")
         }
+        T.test("update: without the API the version comes from the /releases/latest redirect") {
+            func v(_ u: String) -> String? { Updater.version(fromReleasePage: URL(string: u)!) }
+            T.eq(v("https://github.com/Malashkin/JustTellMe/releases/tag/v1.2.0"), "1.2.0")
+            T.eq(v("https://github.com/Malashkin/JustTellMe/releases/tag/2.0"), "2.0")
+            T.eq(v("https://github.com/Malashkin/JustTellMe/releases"), nil, "no releases yet: the page does not redirect to a tag")
+            T.eq(v("https://github.com/Malashkin/JustTellMe/releases/tag/nightly"), nil, "not a version")
+        }
         T.test("update: garbage from the network is rejected, not crashed on") {
             for d in [Data(), Data("<html>rate limited</html>".utf8), Data("{}".utf8), Data("[1,2]".utf8), Data(#"{"tag_name": 5}"#.utf8)] {
                 T.ok(Updater.parse(d) == nil, String(decoding: d, as: UTF8.self))

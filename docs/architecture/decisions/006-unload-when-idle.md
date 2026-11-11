@@ -22,7 +22,8 @@ Neural Engine run after loading takes another ~2 s.
   dropped if anything changed meanwhile (other model, unloaded again).
 
 ## Consequences
-- Measured (`--unload-cycle`): reload 0.36 s (GPU) / 0.57 s (Neural Engine setting), same text as before the unload,
-  encoder attached again ~13 s later.
+- Measured on an idle M1 (`--unload-cycle`): reload 0.22 s (GPU) / 0.30 s (Neural Engine setting), the whole dictation
+  ready 0.76–0.88 s after the key press, same text as before the unload. The encoder is attached again 4 s later; the
+  next dictation then takes 0.80 s. Under heavy load (a parallel compile) the reload took up to 2.7 s.
 - For a few seconds after a reload both contexts are in memory.
 - `JTM_COREML_ENCODER` is a process-wide environment variable, so all `vf_load` calls are serialised with a lock.

@@ -66,6 +66,15 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
                        size: zip?["size"] as? Int ?? 0, notes: j["body"] as? String ?? "")
     }
 
+    /// "https://github.com/o/r/releases/tag/v1.2.0" → "1.2.0"; nil when there is no tag (no releases yet).
+    static func version(fromReleasePage url: URL) -> String? {
+        let parts = url.pathComponents
+        guard let i = parts.lastIndex(of: "tag"), i + 1 < parts.count else { return nil }
+        let tag = parts[i + 1]
+        let v = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        return v.first?.isNumber == true ? v : nil
+    }
+
     // MARK: Checking
 
     private var timer: Timer?
@@ -109,7 +118,30 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
             if let err { r = .failure(err) }
             else if code == 404 { r = .success(nil) } // no releases yet
             else if code == 200, let data { r = .success(parse(data)) }
+            else if code == 403 || code == 429 {
+                // The API allows 60 requests an hour per IP address, shared by everyone behind it (an office NAT).
+                return fetchLatestFromPage(done)
+            }
             else { r = .failure(UpdateError("GitHub ответил \(code)")) }
+            DispatchQueue.main.async { done(r) }
+        }.resume()
+    }
+
+    /// Without the API: the web page /releases/latest redirects to /releases/tag/vX.Y.Z, and the zip
+    /// has a fixed URL per tag. No notes or size this way.
+    static func fetchLatestFromPage(_ done: @escaping (Result<Release?, Error>) -> Void) {
+        var req = URLRequest(url: URL(string: "https://github.com/\(repo)/releases/latest")!, timeoutInterval: 20)
+        req.httpMethod = "HEAD"
+        req.setValue("JustTellMe/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { _, resp, err in
+            let r: Result<Release?, Error>
+            if let err { r = .failure(err) }
+            else if let page = resp?.url, (resp as? HTTPURLResponse)?.statusCode == 200 {
+                r = .success(version(fromReleasePage: page).map {
+                    Release(version: $0, page: page,
+                            zip: URL(string: "https://github.com/\(repo)/releases/download/v\($0)/\(assetName)"), size: 0, notes: "")
+                })
+            } else { r = .failure(UpdateError("GitHub недоступен")) }
             DispatchQueue.main.async { done(r) }
         }.resume()
     }
@@ -186,6 +218,13 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
     static func stage(zip: URL, expectVersion: String?) throws -> URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("JustTellMe-update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do { return try verify(unpacking: zip, into: dir, expectVersion: expectVersion) } catch {
+            try? FileManager.default.removeItem(at: dir) // a refused app must not stay around (it is ~550 MB)
+            throw error
+        }
+    }
+
+    private static func verify(unpacking zip: URL, into dir: URL, expectVersion: String?) throws -> URL {
         guard run("/usr/bin/ditto", ["-x", "-k", zip.path, dir.path]).status == 0 else { throw UpdateError("архив повреждён") }
         let app = dir.appendingPathComponent("JustTellMe.app")
         guard let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) else {
@@ -235,7 +274,7 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
         // Wait for ourselves only when replacing the running app.
         let waitPID = replacingSelf ? ProcessInfo.processInfo.processIdentifier : 0
         p.arguments = ["-c", script, "sh", "\(waitPID)", app.path, target.path, relaunch ? "1" : "0"]
-        do { try p.run() } catch { finish(error); return }
+        do { try p.run() } catch { try? FileManager.default.removeItem(at: app.deletingLastPathComponent()); finish(error); return }
         if replacingSelf {
             NSLog("JustTellMe: installing update, restarting")
             finish(nil)

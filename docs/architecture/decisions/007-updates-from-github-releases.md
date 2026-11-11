@@ -16,7 +16,9 @@ EdDSA key and an appcast for a single-maintainer app.
 ## Decision
 - A release is a GitHub Release `vX.Y.Z` with `JustTellMe.zip`, made by `scripts/release.sh` (build, tests, tag, upload).
 - The app asks `api.github.com/repos/Malashkin/JustTellMe/releases/latest` at most once a day (`checkUpdates`, on by
-  default; the request carries only a `User-Agent: JustTellMe/<version>`).
+  default; the request carries only a `User-Agent: JustTellMe/<version>`). The API allows 60 requests an hour per IP
+  address, shared by everyone behind one (it ran out on the first real test). On 403/429 the app falls back to the web
+  page `github.com/…/releases/latest`, which redirects to the newest tag; the zip URL is fixed per tag.
 - Install: download with `URLSession` (no quarantine flag, so no Gatekeeper prompt), unpack with `ditto`, then refuse
   unless: same bundle id; version equals the release tag; `codesign --verify --deep --strict` passes; the new app
   satisfies the running app's designated requirement (same certificate). Ad-hoc developer builds skip the last check.

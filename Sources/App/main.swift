@@ -207,11 +207,12 @@ if let out = opt("--demo-card") {
     app.run()
 }
 
-//   JustTellMe --update-check            (latest GitHub release vs this build)
+//   JustTellMe --update-check [--page]   (latest GitHub release vs this build; --page: without the API)
 //   JustTellMe --update-stage file.zip [--version X]   (unpack and verify a release zip like the updater does)
 //   JustTellMe --update-install target.app   (full update of another copy of the app, without relaunching it)
 if args.contains("--update-check") {
-    Updater.fetchLatest { r in
+    let fetch = args.contains("--page") ? Updater.fetchLatestFromPage : Updater.fetchLatest
+    fetch { r in
         switch r {
         case .success(let rel?):
             print("latest: \(rel.version) zip: \(rel.zip?.absoluteString ?? "none") size: \(rel.size)")
@@ -224,7 +225,12 @@ if args.contains("--update-check") {
     RunLoop.main.run()
 }
 if let zip = opt("--update-stage") {
-    do { print("ok: \(try Updater.stage(zip: URL(fileURLWithPath: zip), expectVersion: opt("--version")).path)"); exit(0) }
+    do {
+        let app = try Updater.stage(zip: URL(fileURLWithPath: zip), expectVersion: opt("--version"))
+        print("ok: \(app.path)")
+        try? FileManager.default.removeItem(at: app.deletingLastPathComponent())
+        exit(0)
+    }
     catch { print("rejected: \(error.localizedDescription)"); exit(1) }
 }
 if let target = opt("--update-install") {

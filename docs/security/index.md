@@ -12,8 +12,9 @@ What JustTellMe keeps, where, and which permissions it needs. Up: [AGENTS.md](..
 
 Recognition runs locally (whisper.cpp). The app goes to the network only for:
 - a model or the Neural Engine encoder you chose to download, from `huggingface.co/ggerganov/whisper.cpp`;
-- the update check, at most once a day: `GET api.github.com/repos/Malashkin/JustTellMe/releases/latest` with
-  `User-Agent: JustTellMe/<version>`. Nothing else is sent. Turn it off in Настройки → Обновления (`checkUpdates`);
+- the update check, at most once a day: `GET api.github.com/repos/Malashkin/JustTellMe/releases/latest` (or, when
+  the API limit is used up, `HEAD github.com/Malashkin/JustTellMe/releases/latest`) with `User-Agent: JustTellMe/<version>`.
+  Nothing else is sent. Turn it off in Настройки → Обновления (`checkUpdates`);
 - downloading an update, after you click «Установить».
 
 No telemetry, no accounts. Audio and text never leave the Mac.
