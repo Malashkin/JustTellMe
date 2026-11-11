@@ -10,10 +10,10 @@
 | Unit | 47 (incl. 2 property-based) | ✅ | stats and streak, Russian plural/duration formatting, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
 | Integration (files) | 10 (incl. 1 property-based) | ✅ | history save/delete/clear and JSON round trip, personal dictionary and replacements end to end, save/load from the dictionary page, built-in dictionary (no client names, all rules valid) |
 | Unit, v1.1 features | 20 (incl. 4 property-based) | ✅ | unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
-| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused |
+| Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused; a release zip installed over another copy (no hang, no leftovers) |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 89 passed, 0 failed, 0 skipped, 97 s (fast suite: 81 passed, 3 s).
+**Total:** 90 passed, 0 failed, 0 skipped, 173 s (fast suite: 81 passed, 3 s).
 
 ## Mutation testing
 
@@ -24,9 +24,9 @@ No Swift mutation tool is installed, so 14 hand-picked mutants were applied to t
 8-day week, en/ru tie, long phrase dropped as junk, repeat collapse removed, cut before 5 s, earliest instead of
 latest pause, rule size limit, case-only term lost, casing applied to English.
 
-**v1.1: 10/10 killed.** Version order reversed, editable element ignored, «nothing focused» always «no field»,
+**v1.1: 11/11 killed.** Version order reversed, editable element ignored, «nothing focused» always «no field»,
 Chrome/Electron check removed, draft releases accepted, no space after «…», unload default «never», idle pulse
-of the bars removed, update signature not verified, update version not checked.
+of the bars removed, update signature not verified, update version not checked, swap script waiting on PID 0.
 
 ## Coverage
 
@@ -61,6 +61,8 @@ the global hotkey, microphone capture and pasting (they need a real session with
   falls back to the `releases/latest` page (1.1.1).
 - Each refused update archive left an unpacked ~550 MB app in the temporary folder; the test runs had piled up
   11 GB. Refused archives are now deleted (1.1.1).
+- Installing over another copy (not the running app) hung: the swap script waited on PID 0, and `kill -0 0` is
+  the whole process group. Self-updates were unaffected. Fixed; the new install test timed out before the fix.
 
 ## Not tested
 

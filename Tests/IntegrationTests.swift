@@ -237,6 +237,24 @@ enum IntegrationTests {
             let r = try run(bin, ["--update-stage", try zip(c, "adhoc.zip").path], timeout: 120)
             T.ok(r.status != 0 && r.out.contains("другим сертификатом"), r.out)
         }
+        T.test("update: installing a release zip replaces another copy of the app, without hanging or leftovers") {
+            guard let g = good else { return T.fail("could not zip the app") }
+            let z = work.appendingPathComponent("install.zip")
+            try FileManager.default.copyItem(at: g, to: z) // the installer deletes the zip it used
+            let target = work.appendingPathComponent("Applications/JustTellMe.app")
+            try FileManager.default.createDirectory(at: target.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+            try "old".write(to: target.appendingPathComponent("Contents/old-marker"), atomically: true, encoding: .utf8)
+            let tmp = FileManager.default.temporaryDirectory.path
+            func leftovers() -> Int { ((try? FileManager.default.contentsOfDirectory(atPath: tmp)) ?? []).filter { $0.hasPrefix("JustTellMe-update-") }.count }
+            let before = leftovers()
+            let r = try run(bin, ["--update-install", target.path, "--zip", z.path, "--version", version], timeout: 120)
+            T.eq(r.status, 0, r.out + r.err)
+            let v = NSDictionary(contentsOf: target.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String
+            T.eq(v, version, "the target must now be the new app")
+            T.ok(!FileManager.default.fileExists(atPath: target.appendingPathComponent("Contents/old-marker").path), "old app still there")
+            T.ok(!FileManager.default.fileExists(atPath: target.path + ".old"), "backup of the old app left behind")
+            T.eq(leftovers(), before, "unpacked update left in the temporary folder")
+        }
         T.test("update: a zip with something else inside is refused") {
             let dir = work.appendingPathComponent("junk/JustTellMe.app/Contents")
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

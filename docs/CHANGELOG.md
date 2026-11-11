@@ -10,6 +10,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Fixed
+- `--update-install` of another copy of the app hung forever: the swap script waited on PID 0 (`kill -0 0` means the whole process group). Self-updates were not affected. A test now installs a local release zip over another copy.
+
+### Added
+- `--update-install target.app --zip file.zip --version X` installs from a local zip (used by the tests).
+
 ## [1.1.1] — 2026-11-11
 
 ### Fixed

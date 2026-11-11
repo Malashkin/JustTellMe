@@ -188,11 +188,23 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
         // The file is deleted when this method returns: move it out first.
         let zip = FileManager.default.temporaryDirectory.appendingPathComponent("JustTellMe-\(r.version)-\(UUID().uuidString).zip")
         do { try FileManager.default.moveItem(at: location, to: zip) } catch { finish(error); return }
+        installFile(zip, version: r.version)
+    }
+
+    /// Install an already downloaded release zip (it is deleted afterwards). Also used by --update-install --zip.
+    func install(zipFile zip: URL, version: String, target: URL, relaunch: Bool, done: ((Error?) -> Void)? = nil) {
+        installTarget = target
+        self.relaunch = relaunch
+        installDone = done
+        installFile(zip, version: version)
+    }
+
+    private func installFile(_ zip: URL, version: String) {
         state = .installing
         let target = installTarget
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let app = try Self.stage(zip: zip, expectVersion: r.version)
+                let app = try Self.stage(zip: zip, expectVersion: version)
                 try? FileManager.default.removeItem(at: zip)
                 DispatchQueue.main.async { self.swap(to: app, target: target) }
             } catch {
@@ -261,8 +273,9 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.swap(to: app, target: target) }
             return
         }
+        // $1 is our PID when replacing ourselves, else 0 (careful: `kill -0 0` means the whole process group).
         let script = """
-            while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+            if [ "$1" != 0 ]; then while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; fi
             rm -rf "$3.old"
             if mv "$3" "$3.old" && /usr/bin/ditto "$2" "$3"; then rm -rf "$3.old"; else rm -rf "$3"; mv "$3.old" "$3"; fi
             rm -rf "$(dirname "$2")"

@@ -209,7 +209,8 @@ if let out = opt("--demo-card") {
 
 //   JustTellMe --update-check [--page]   (latest GitHub release vs this build; --page: without the API)
 //   JustTellMe --update-stage file.zip [--version X]   (unpack and verify a release zip like the updater does)
-//   JustTellMe --update-install target.app   (full update of another copy of the app, without relaunching it)
+//   JustTellMe --update-install target.app [--zip file.zip --version X]
+//   (full update of another copy of the app, without relaunching it; --zip: from a local release zip)
 if args.contains("--update-check") {
     let fetch = args.contains("--page") ? Updater.fetchLatestFromPage : Updater.fetchLatest
     fetch { r in
@@ -237,6 +238,14 @@ if let target = opt("--update-install") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     let u = Updater()
+    // --zip file --version X: install a local release zip (no download), for tests.
+    if let zip = opt("--zip"), let v = opt("--version") {
+        u.install(zipFile: URL(fileURLWithPath: zip), version: v, target: URL(fileURLWithPath: target), relaunch: false) { err in
+            print(err.map { "error: \($0.localizedDescription)" } ?? "installed \(v)")
+            exit(err == nil ? 0 : 1)
+        }
+        app.run()
+    }
     Updater.fetchLatest { r in
         guard case .success(let rel?) = r else { print("error: no release"); exit(1) }
         var last = -1

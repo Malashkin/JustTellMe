@@ -27,7 +27,7 @@ The run uses a fresh temporary `JTM_SUPPORT_DIR`, so your history, dictionary an
 | `Tests/Harness.swift` | — | `T.test` / `T.eq` / `T.ok`, `SeededRandom` for deterministic property tests |
 | `Tests/UnitTests.swift` | unit | stats and streak, Russian plurals and durations, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
 | `Tests/FeatureTests.swift` | unit | 1.1 features: unload default, trailing space for paste-again, «is a text field focused» decisions (incl. Chrome/Electron), version order and GitHub release parsing, waveform bars |
-| `Tests/IntegrationTests.swift` | integration | history file, personal dictionary end to end, built-in dictionary (no client names, checked by hash; valid rules), the app binary (`--learn`, `--list-models`, TTS speech via `--transcribe` and `--stream`, reload after idle via `--unload-cycle`), update archives via `--update-stage` (accepted; wrong version, modified, other certificate, other app refused) |
+| `Tests/IntegrationTests.swift` | integration | history file, personal dictionary end to end, built-in dictionary (no client names, checked by hash; valid rules), the app binary (`--learn`, `--list-models`, TTS speech via `--transcribe` and `--stream`, reload after idle via `--unload-cycle`), update archives via `--update-stage` (accepted; wrong version, modified, other certificate, other app refused) and `--update-install --zip` (replaces another copy, no hang, no leftovers) |
 | `Tests/main.swift` | — | runs everything, prints a summary |
 
 ## Writing a test
