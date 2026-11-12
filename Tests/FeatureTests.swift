@@ -11,6 +11,45 @@ enum FeatureTests {
         updateVersions()
         releaseParsing()
         waveform()
+        doubleTap()
+    }
+
+    // MARK: Double tap for hands-free (like Wispr Flow)
+
+    static func doubleTap() {
+        T.test("key: by default a double tap starts hands-free dictation, holding is push-to-talk") {
+            let d = UserDefaults.standard
+            let saved = d.object(forKey: "trigger")
+            defer { d.set(saved, forKey: "trigger") }
+            d.removeObject(forKey: "trigger")
+            T.eq(Prefs.trigger, .holdOrDoubleTap)
+            T.eq(KeyRelease.classify(held: 0.12, trigger: Prefs.trigger), .awaitSecondTap, "first short press waits for the second")
+            T.eq(KeyRelease.classify(held: 1.5, trigger: Prefs.trigger), .finish, "holding still works as before")
+        }
+        T.test("key: a single short tap means what the chosen mode says") {
+            T.eq(KeyRelease.classify(held: 0.1, trigger: .holdOrTap), .lockHandsFree)
+            T.eq(KeyRelease.classify(held: 0.1, trigger: .holdOnly), .cancel, "hold-only: a tap is a stray touch")
+        }
+        T.test("key: an explicit choice of the old single-tap mode is kept") {
+            let d = UserDefaults.standard
+            let saved = d.object(forKey: "trigger")
+            defer { d.set(saved, forKey: "trigger") }
+            Prefs.trigger = .holdOrTap
+            T.eq(Prefs.trigger, .holdOrTap)
+        }
+        T.test("key: property — any press of at least 0.3 s is push-to-talk in every mode") {
+            var rng = SeededRandom(21)
+            for _ in 0..<300 {
+                let held = Double.random(in: 0...3, using: &rng)
+                for t in Prefs.Trigger.allCases {
+                    let r = KeyRelease.classify(held: held, trigger: t)
+                    T.ok((held >= KeyRelease.minHold) == (r == .finish), "held \(held) in \(t) → \(r)")
+                }
+            }
+        }
+        T.test("key: the double-tap window is short enough to feel instant and long enough for a normal double tap") {
+            T.ok(KeyRelease.doubleTapWindow >= 0.3 && KeyRelease.doubleTapWindow <= 0.5, "\(KeyRelease.doubleTapWindow)")
+        }
     }
 
     // MARK: 1. Unload after idle by default

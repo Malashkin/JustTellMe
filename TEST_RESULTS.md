@@ -1,6 +1,6 @@
 # Test Results
 
-**Date:** 2026-11-11 (v1.1.2) · **Status:** 🟢 PASS
+**Date:** 2026-11-12 (v1.2.0) · **Status:** 🟢 PASS
 **Stack:** Swift 5.10 + C shim (whisper.cpp), macOS desktop app, Command Line Tools only (no XCTest)
 **Runner:** `scripts/test.sh` (a test executable built from `Sources/App` + `Tests/`; `JTM_SKIP_SLOW=1` skips speech recognition)
 **Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched.
@@ -9,11 +9,11 @@
 |---|---|---|---|
 | Unit | 47 (incl. 2 property-based) | ✅ | stats and streak, Russian plural/duration formatting, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
 | Integration (files) | 10 (incl. 1 property-based) | ✅ | history save/delete/clear and JSON round trip, personal dictionary and replacements end to end, save/load from the dictionary page, built-in dictionary (no client names, all rules valid) |
-| Unit, v1.1 features | 20 (incl. 4 property-based) | ✅ | unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
+| Unit, v1.1–1.2 features | 25 (incl. 5 property-based) | ✅ | double tap → hands-free by default, single-tap and hold-only modes, any press ≥ 0.3 s is push-to-talk, unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
 | Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, the idle timer frees the model even if it was used after being armed, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused; a release zip installed over another copy (no hang, no leftovers) |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 91 passed, 0 failed, 0 skipped, 157 s (fast suite: 81 passed, 3 s).
+**Total:** 96 passed, 0 failed, 0 skipped, 170 s (fast suite: 86 passed, 10 s).
 
 ## Mutation testing
 
@@ -23,6 +23,8 @@ No Swift mutation tool is installed, so 14 hand-picked mutants were applied to t
 **Score: 14/14 killed.** Mutants: saved time sign and floor, wpm unit, streak without today, plural for 11,
 8-day week, en/ru tie, long phrase dropped as junk, repeat collapse removed, cut before 5 s, earliest instead of
 latest pause, rule size limit, case-only term lost, casing applied to English.
+
+**v1.2 double tap: 3/3 killed** (double tap treated as single tap, old default, hold boundary).
 
 **v1.1: 11/11 killed.** Version order reversed, editable element ignored, «nothing focused» always «no field»,
 Chrome/Electron check removed, draft releases accepted, no space after «…», unload default «never», idle pulse

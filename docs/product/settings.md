@@ -1,7 +1,7 @@
 ---
 audience: product
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Settings
@@ -12,7 +12,7 @@ Values are stored in `UserDefaults` (domain `com.justtellme.app`). Read them wit
 | Setting | Key | Default | Notes |
 |---|---|---|---|
 | Dictation key | `hotkey` | `fn` | `fn` or `rightOption` |
-| How the key works | `trigger` | `holdOrTap` | `holdOrTap`: a short tap means hands-free. `holdOnly`: hold only. |
+| How the key works | `trigger` | `holdOrDoubleTap` | `holdOrDoubleTap`: a double tap means hands-free. `holdOrTap`: a single short tap means hands-free. `holdOnly`: hold only. |
 | Language | `language` | `auto` | `auto` decodes as Russian (no detection pass). The label in history comes from the script. |
 | Microphone | `micUID` | system default | CoreAudio device UID. Falls back to the system mic if that device is unplugged. |
 | Model | `modelPath` | bundled large-v3-turbo | |

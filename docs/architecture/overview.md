@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Overview
@@ -54,7 +54,7 @@ sequenceDiagram
         S->>S: ≥8 s pending? find a pause (≥0.3 s, piece ≥5 s; forced at 25 s)
         S->>W: transcribe piece (prompt + last 150 chars of the previous piece)
     end
-    K->>A: key up (or second tap in hands-free mode)
+    K->>A: key up (or, hands-free after a double tap, the next press)
     A->>R: stop
     A->>S: finish → last piece
     S->>W: transcribe remainder

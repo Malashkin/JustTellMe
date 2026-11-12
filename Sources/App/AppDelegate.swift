@@ -40,10 +40,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastResult = ""
     private var downloadProgress: Double?
 
-    private let minHold: TimeInterval = 0.3
     private let maxHandsFree: TimeInterval = 5 * 60
     private var handsFree = false
     private var ignoreNextUp = false
+    /// Pending after the first short press of a double tap: drops the recording if no second press comes.
+    private var secondTapWork: DispatchWorkItem?
     private var job = 0
     private var session: StreamingDictation?
     private var pollTimer: Timer?
@@ -222,6 +223,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Push to talk
 
     private func pttDown() {
+        // Second press of a double tap: keep listening hands-free until the next press.
+        if let w = secondTapWork, case .recording = state {
+            w.cancel()
+            secondTapWork = nil
+            ignoreNextUp = true
+            lockHandsFree()
+            return
+        }
         // Hands-free recording in progress: this tap ends it (and its key-up is ignored).
         if case .recording = state, handsFree {
             ignoreNextUp = true
@@ -262,19 +271,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func pttUp() {
         if ignoreNextUp { ignoreNextUp = false; return }
         guard case .recording = state, !handsFree else { return }
-        if Date().timeIntervalSince(recordStart) < minHold {
-            guard Prefs.trigger == .holdOrTap else { cancelRecording(); return }
-            // Short tap: keep listening until the next tap (or Esc).
-            handsFree = true
-            overlay.locked = true
-            let started = recordStart
-            DispatchQueue.main.asyncAfter(deadline: .now() + maxHandsFree) { [weak self] in
-                guard let self, case .recording = self.state, self.handsFree, self.recordStart == started else { return }
-                self.finishRecording()
+        switch KeyRelease.classify(held: Date().timeIntervalSince(recordStart), trigger: Prefs.trigger) {
+        case .finish: finishRecording()
+        case .cancel: cancelRecording()
+        case .lockHandsFree: lockHandsFree()
+        case .awaitSecondTap:
+            // Keep recording meanwhile, so nothing said right after the double tap is lost.
+            let w = DispatchWorkItem { [weak self] in
+                self?.secondTapWork = nil
+                self?.cancelRecording()
             }
-            return
+            secondTapWork = w
+            DispatchQueue.main.asyncAfter(deadline: .now() + KeyRelease.doubleTapWindow, execute: w)
         }
-        finishRecording()
+    }
+
+    /// Keep listening until the next press of the key (or Esc), at most `maxHandsFree`.
+    private func lockHandsFree() {
+        handsFree = true
+        overlay.locked = true
+        let started = recordStart
+        DispatchQueue.main.asyncAfter(deadline: .now() + maxHandsFree) { [weak self] in
+            guard let self, case .recording = self.state, self.handsFree, self.recordStart == started else { return }
+            self.finishRecording()
+        }
     }
 
     /// Esc: drop the current recording, or discard a transcription that is still running.
@@ -291,6 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func cancelRecording() {
+        secondTapWork?.cancel()
+        secondTapWork = nil
         guard case .recording = state else { return }
         _ = recorder.stop()
         stopStreaming(cancel: true)
@@ -300,6 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func finishRecording() {
+        secondTapWork?.cancel()
+        secondTapWork = nil
         guard case .recording = state else { return }
         handsFree = false
         let audio = recorder.stop()

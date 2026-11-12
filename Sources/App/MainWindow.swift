@@ -283,6 +283,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         guard s != lastStatus else { return }
         lastStatus = s
         hint.stringValue = "Зажмите \(s.hotkey), говорите, отпустите — текст вставится туда, где стоит курсор. "
+            + (Prefs.trigger == .holdOrDoubleTap ? "Дважды нажмите \(s.hotkey) — диктовка без рук, ещё одно нажатие — готово. " : "")
             + (Prefs.trigger == .holdOrTap ? "Короткое нажатие \(s.hotkey) — диктовка без рук до следующего нажатия. " : "")
             + "Esc — отмена."
         problems.arrangedSubviews.forEach { $0.removeFromSuperview() }

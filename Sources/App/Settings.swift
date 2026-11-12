@@ -5,10 +5,11 @@ import CoreAudio
 /// User preferences (UserDefaults-backed).
 enum Prefs {
     enum Trigger: String, CaseIterable {
-        case holdOrTap, holdOnly
+        case holdOrDoubleTap, holdOrTap, holdOnly
         var title: String {
             switch self {
-            case .holdOrTap: return "Удерживать или нажать (короткое нажатие — без рук)"
+            case .holdOrDoubleTap: return "Удерживать или нажать дважды (двойное нажатие — без рук)"
+            case .holdOrTap: return "Удерживать или нажать один раз (короткое нажатие — без рук)"
             case .holdOnly: return "Только удерживать"
             }
         }
@@ -17,7 +18,7 @@ enum Prefs {
     private static let d = UserDefaults.standard
 
     static var trigger: Trigger {
-        get { Trigger(rawValue: d.string(forKey: "trigger") ?? "") ?? .holdOrTap }
+        get { Trigger(rawValue: d.string(forKey: "trigger") ?? "") ?? .holdOrDoubleTap }
         set { d.set(newValue.rawValue, forKey: "trigger") }
     }
     static var sounds: Bool {

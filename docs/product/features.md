@@ -1,7 +1,7 @@
 ---
 audience: product
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Features
@@ -9,7 +9,7 @@ updated: 2026-11-11
 ## Dictation
 
 - **Hold to talk:** hold Fn (🌐) or right ⌥, speak, then release. The text is pasted at the cursor in any app.
-- **Hands-free:** a short tap (under 0.3 s) starts recording; the next press stops it. A red dot on the overlay shows this mode. Recording stops on its own after 5 minutes.
+- **Hands-free (double tap):** double-tap the key (two presses, the second within 0.4 s) and speak without holding it; one more press stops and transcribes. A red dot on the overlay shows this mode. Recording stops on its own after 5 minutes. A single stray tap does nothing. Other modes: «нажать один раз» (a single short tap starts hands-free) and «только удерживать».
 - **Esc** cancels the recording, or the recognition if it is already running.
 - **Overlay:** a pill at the bottom of the screen. A calm waveform shows recording; an orange animation shows recognition. It is drawn with Core Animation layers at 30 fps, about 2.4× less CPU than before.
 - **Speed:** long speech is recognised in pieces while you talk, so the text appears about 1 s after release (Neural Engine) or 1–2 s (GPU), even after 30 s of speech.

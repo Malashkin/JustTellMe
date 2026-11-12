@@ -92,6 +92,34 @@ final class PushToTalkHotkey {
     }
 }
 
+/// What letting go of the dictation key means. Holding it is push-to-talk; a short press is either
+/// a hands-free tap, the first half of a double tap, or a stray touch, depending on the mode.
+enum KeyRelease: Equatable {
+    /// Held long enough: push-to-talk is over, transcribe.
+    case finish
+    /// «Нажать один раз» mode: keep listening until the next press.
+    case lockHandsFree
+    /// «Нажать дважды» mode: keep recording; a second press within `doubleTapWindow` locks hands-free,
+    /// otherwise the recording is dropped.
+    case awaitSecondTap
+    /// A stray short press: drop the recording.
+    case cancel
+
+    /// Shorter presses are taps, not push-to-talk.
+    static let minHold: TimeInterval = 0.3
+    /// Time from the first release to the second press of a double tap.
+    static let doubleTapWindow: TimeInterval = 0.4
+
+    static func classify(held: TimeInterval, trigger: Prefs.Trigger) -> KeyRelease {
+        guard held < minHold else { return .finish }
+        switch trigger {
+        case .holdOrDoubleTap: return .awaitSecondTap
+        case .holdOrTap: return .lockHandsFree
+        case .holdOnly: return .cancel
+        }
+    }
+}
+
 /// A system-wide shortcut through Carbon's RegisterEventHotKey: the key press is consumed (it never
 /// reaches the frontmost app) and no permission is needed. Used for ⌃⌥V «вставить последнее ещё раз».
 final class GlobalShortcut {

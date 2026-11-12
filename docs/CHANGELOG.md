@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Changelog
@@ -10,7 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
-## [1.1.2] — 2026-11-11
+## [1.2.0] — 2026-11-12
+
+### Added
+- **Double tap for hands-free dictation, like Wispr Flow.** Double-tap Fn (or the chosen key) and speak without holding it; one more press stops and transcribes. Holding still works as push-to-talk, and a single stray tap does nothing. This is the new default; «Удерживать или нажать один раз» and «Только удерживать» stay in Настройки → «Как работает клавиша».
 
 ### Fixed
 - **The model is really freed after the idle time.** The idle timer fired once and gave up if the model had been used, or had finished loading, after it was armed. Right after launch that is always the case, so the model stayed in memory until the first dictation. It now re-arms for the remaining time.
