@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let neural = NeuralEngine()
     private let fixWindow = CorrectionWindow()
     private let noFieldCard = NoFieldCard()
+    private let noteCard = NoteSavedCard()
     let updater = Updater()
     private var repasteShortcut: GlobalShortcut?
     private var state: State = .loading
@@ -68,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.onUp = { [weak self] in self?.pttUp() }
         hotkey.onCombo = { [weak self] in self?.cancelRecording() }
         hotkey.onEscape = { [weak self] in self?.escapePressed() }
+        noteCard.onOpen = { [weak self] in self?.main.open(.notes) }
         applyUnloadPref()
         transcriber.onEncoderAttached = { [weak self] in self?.rebuildModelMenu(); self?.main.refresh() }
         repasteShortcut = GlobalShortcut(keyCode: kVK_ANSI_V, modifiers: controlKey | optionKey) { [weak self] in self?.pasteLastAgain() }
@@ -348,10 +350,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.lastResult = r.text
             self.updateStatusLine()
             let front = NSWorkspace.shared.frontmostApplication
+            if let note = NoteCommand.body(of: r.text) {
+                self.saveNote(note, lang: r.lang)
+                return
+            }
             History.shared.add(text: r.text, lang: r.lang, app: front?.localizedName, seconds: Double(audio.count) / 16_000)
             Paster.shared.insert(Paster.withTrailingSpace(r.text))
             self.offerCopyIfNoField(r.text, in: front)
         }
+    }
+
+    /// «Заметка …»: the text goes to the Заметки page instead of the frontmost app.
+    private func saveNote(_ text: String, lang: String) {
+        guard !text.isEmpty else { NSSound.beep(); return }
+        Notes.shared.add(text: text, lang: lang)
+        NSLog("JustTellMe: note saved, %d chars", text.count)
+        if Prefs.sounds { NSSound(named: "Glass")?.play() }
+        noteCard.show(text)
     }
 
     /// Pasting went nowhere (no text field focused): show the text with a «Скопировать» button.

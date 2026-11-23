@@ -23,6 +23,10 @@ The text is pasted with ⌘V. Your clipboard is restored right after the target 
 - **⌃⌥V pastes the last dictation again** where the cursor is now, e.g. when it went to the wrong field. Also in the menu: 🎙 → «Вставить последнее ещё раз». It works without extra permissions, and the key press never reaches the app you are in.
 - **No text field?** If the cursor was not in a text field (Finder, the desktop, a list, a web page with nothing focused), a card «Курсор не в поле ввода?» shows the text with a «Скопировать» button for 12 s. When JustTellMe cannot tell (Chrome, Electron apps such as VS Code or Slack), it stays quiet rather than show the card for nothing. The text is always in the feed on Главная anyway.
 
+## Voice notes
+
+Start a dictation with the word «Заметка» and the rest of the phrase becomes a note: nothing is pasted into the frontmost app. «Заметка, купить молоко.» saves «Купить молоко.». Only the word at the very start counts, as a whole word: «Это заметка про отпуск» and «Заметками займусь завтра» are pasted as usual. «Заметка» alone saves nothing and beeps. A card «Заметка сохранена» shows the text for 4 s with «Открыть заметки». Notes are not part of the Главная feed or the stats.
+
 ## Main window
 
 Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → «Открыть JustTellMe…» (⌘O in the menu). While the window is open the app has a Dock icon.
@@ -30,6 +34,7 @@ Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → «Откр�
 | Page | What's there |
 |---|---|
 | **Главная** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Search; double-click to copy; right-click to fix or delete; «Очистить всё…». |
+| **Заметки** | Voice notes, newest first, grouped by day, with time and search. |
 | **Статистика** | Today / 7 / 30 days / all time: words, characters, dictations, speaking time, words per minute, time saved (typing at 40 wpm minus speaking time); words-per-day chart; apps; languages; streak |
 | **Словарь** | Prompt, personal dictionary, personal replacements (`wrong => right`), on/off toggle for the read-only built-in dictionary |
 | **Настройки** | All settings, see [settings.md](settings.md) |

@@ -12,6 +12,47 @@ enum FeatureTests {
         releaseParsing()
         waveform()
         doubleTap()
+        voiceNotes()
+    }
+
+    // MARK: «Заметка …» saves a note instead of pasting
+
+    static func voiceNotes() {
+        T.test("notes: a dictation starting with «Заметка» becomes a note without the keyword") {
+            T.eq(NoteCommand.body(of: "Заметка купить молоко."), "Купить молоко.")
+            T.eq(NoteCommand.body(of: "Заметка, позвонить в банк"), "Позвонить в банк")
+            T.eq(NoteCommand.body(of: "Заметка: созвон в 15:00."), "Созвон в 15:00.")
+            T.eq(NoteCommand.body(of: "Заметка. Забрать посылку."), "Забрать посылку.")
+            T.eq(NoteCommand.body(of: "  заметка — идея для статьи"), "Идея для статьи")
+            T.eq(NoteCommand.body(of: "ЗАМЕТКА deploy в пятницу"), "Deploy в пятницу")
+        }
+        T.test("notes: only the keyword at the very start counts, as a whole word") {
+            T.eq(NoteCommand.body(of: "Это заметка про отпуск."), nil)
+            T.eq(NoteCommand.body(of: "Заметками займусь завтра."), nil)
+            T.eq(NoteCommand.body(of: "Заметкам нужен поиск"), nil)
+            T.eq(NoteCommand.body(of: "Купить молоко"), nil)
+            T.eq(NoteCommand.body(of: ""), nil)
+        }
+        T.test("notes: the keyword alone gives an empty note, which is not pasted either") {
+            T.eq(NoteCommand.body(of: "Заметка."), "")
+            T.eq(NoteCommand.body(of: "Заметка"), "")
+        }
+        T.test("notes: saved newest first, survive a reload, searchable case-insensitively") {
+            let store = Notes.shared
+            let before = store.entries.count
+            store.add(text: "Купить молоко", lang: "ru", date: Date(timeIntervalSinceNow: -60))
+            store.add(text: "Позвонить в Банк", lang: "ru")
+            store.load()
+            T.eq(store.entries.count, before + 2)
+            T.eq(store.entries.first?.text, "Позвонить в Банк", "newest first")
+            T.eq(Notes.filter(store.entries, query: " банк ").map(\.text), ["Позвонить в Банк"])
+            T.eq(Notes.filter(store.entries, query: "").count, store.entries.count)
+            T.ok(FileManager.default.fileExists(atPath: Paths.support.appendingPathComponent("notes.json").path), "stored in the support folder")
+        }
+        T.test("notes: the main window has a Заметки page right after Главная") {
+            T.eq(MainWindow.Page.notes.rawValue, MainWindow.Page.home.rawValue + 1)
+            T.eq(MainWindow.Page.notes.title, "Заметки")
+        }
     }
 
     // MARK: Double tap for hands-free (like Wispr Flow)

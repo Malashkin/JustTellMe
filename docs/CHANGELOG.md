@@ -10,6 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Added
+- **Voice notes.** Start a dictation with the word «Заметка» («Заметка: позвонить в банк») and the rest is saved as a note instead of being pasted. A card «Заметка сохранена» confirms it, with a button to open the notes. Notes live on the new page Заметки in the main window: newest first, grouped by day, with search. Only the word at the very start counts («Это заметка про…» is pasted as usual); «Заметка» alone saves nothing. Notes are kept in `notes.json` and are not counted in the dictation feed or the stats.
+- `--demo-note-card out.png` renders the «Заметка сохранена» card.
+
 ## [1.2.0] — 2026-11-12
 
 ### Added

@@ -12,16 +12,17 @@ struct AppStatus: Equatable {
     var update: String?
 }
 
-/// The app's only window: a sidebar with Главная (feed + quick stats), Статистика, Словарь, Настройки.
+/// The app's only window: a sidebar with Главная (feed + quick stats), Заметки, Статистика, Словарь, Настройки.
 /// Opened from the menu-bar icon or by launching the app again from Finder/Launchpad/Dock.
 final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     enum Page: Int, CaseIterable {
-        case home, stats, vocabulary, settings
-        var title: String { ["Главная", "Статистика", "Словарь", "Настройки"][rawValue] }
-        var symbol: String { ["house", "chart.bar.xaxis", "character.book.closed", "gearshape"][rawValue] }
+        case home, notes, stats, vocabulary, settings
+        var title: String { ["Главная", "Заметки", "Статистика", "Словарь", "Настройки"][rawValue] }
+        var symbol: String { ["house", "note.text", "chart.bar.xaxis", "character.book.closed", "gearshape"][rawValue] }
     }
 
     let home = HomePane()
+    let notes = NotesPane()
     let stats = StatsPane()
     let vocabulary = VocabularyPane()
     let settings = SettingsPane()
@@ -38,6 +39,10 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         super.init()
         home.onOpenStats = { [weak self] in self?.open(.stats) }
         History.shared.onChange = { [weak self] in self?.historyChanged() }
+        Notes.shared.onChange = { [weak self] in
+            guard let self, self.isVisible, self.page == .notes else { return }
+            self.notes.reload()
+        }
     }
 
     func open(_ p: Page? = nil) {
@@ -79,6 +84,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         let pane: NSView
         switch p {
         case .home: home.reload(); home.refreshStatus(); pane = home.view
+        case .notes: notes.reload(); pane = notes.view
         case .stats: stats.reload(); pane = stats.view
         case .vocabulary: vocabulary.reload(); pane = vocabulary.view
         case .settings: settings.reload(); pane = settings.view

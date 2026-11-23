@@ -225,6 +225,17 @@ if let out = opt("--demo-card") {
     app.run()
 }
 
+//   JustTellMe --demo-note-card out.png   (renders the «Заметка сохранена» card)
+if let out = opt("--demo-note-card") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    app.appearance = NSAppearance(named: .aqua)
+    let c = NoteSavedCard()
+    c.show("Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте.")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
+    app.run()
+}
+
 //   JustTellMe --update-check [--page]   (latest GitHub release vs this build; --page: without the API)
 //   JustTellMe --update-stage file.zip [--version X]   (unpack and verify a release zip like the updater does)
 //   JustTellMe --update-install target.app [--zip file.zip --version X]
