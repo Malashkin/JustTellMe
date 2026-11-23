@@ -76,6 +76,24 @@ enum FeatureTests {
             let s = NotesPane.stamp(cal.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 9, minute: 5))!)
             T.ok(s.hasPrefix("23 ") && s.hasSuffix(", 09:05"), "date and time on the note, got \(s)")
         }
+        T.test("notes: tick several notes and delete them at once") {
+            let d = Date()
+            let a = Note(id: UUID(), date: d, text: "Первая", lang: "ru")
+            let b = Note(id: UUID(), date: d, text: "Вторая", lang: "ru")
+            let c = Note(id: UUID(), date: d, text: "Третья", lang: "ru")
+            let shown = [a, b, c]
+            T.eq(NotesPane.toDelete(checked: [a.id, c.id], highlighted: [b], shown: shown), [a, c], "ticks win over the highlight")
+            T.eq(NotesPane.toDelete(checked: [], highlighted: [b], shown: shown), [b], "no ticks: the highlighted notes")
+            T.eq(NotesPane.toggleAll([], shown: shown), Set([a.id, b.id, c.id]), "«Отметить все» ticks every visible note")
+            T.eq(NotesPane.toggleAll([a.id], shown: shown), Set([a.id, b.id, c.id]), "some ticked: tick the rest")
+            T.eq(NotesPane.toggleAll([a.id, b.id, c.id], shown: shown), [], "all ticked: «Снять отметки» clears")
+            T.eq(NotesPane.toggleAll([], shown: []), [], "nothing to tick")
+            T.eq(NotesPane.visibleChecks([a.id, c.id], shown: [a, b]), [a.id], "a ticked note hidden by search is not deleted")
+            T.eq(NotesPane.deleteTitle(0), "Удалить")
+            T.eq(NotesPane.deleteTitle(1), "Удалить 1 заметку")
+            T.eq(NotesPane.deleteTitle(3), "Удалить 3 заметки")
+            T.eq(NotesPane.deleteTitle(5), "Удалить 5 заметок")
+        }
         T.test("notes: the main window has a Заметки page right after Главная") {
             T.eq(MainWindow.Page.notes.rawValue, MainWindow.Page.home.rawValue + 1)
             T.eq(MainWindow.Page.notes.title, "Заметки")

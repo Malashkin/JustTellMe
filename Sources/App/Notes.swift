@@ -87,7 +87,31 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
     private let deleteButton = NSButton(title: "Удалить", target: nil, action: nil)
+    private let checkAllButton = NSButton(title: "Отметить все", target: nil, action: nil)
     private var rows: [Row] = []
+    /// Notes ticked with the checkbox in front of them.
+    private(set) var checked: Set<UUID> = []
+
+    /// Ticks that still point at a visible note (a search or a deletion drops the rest,
+    /// so «Удалить» never removes a note the user cannot see).
+    static func visibleChecks(_ checked: Set<UUID>, shown: [Note]) -> Set<UUID> {
+        checked.intersection(shown.map(\.id))
+    }
+
+    /// What «Удалить» removes: the ticked notes if any, otherwise the highlighted ones.
+    static func toDelete(checked: Set<UUID>, highlighted: [Note], shown: [Note]) -> [Note] {
+        checked.isEmpty ? highlighted : shown.filter { checked.contains($0.id) }
+    }
+
+    /// «Отметить все» ticks every visible note; when all are ticked already it clears the ticks.
+    static func toggleAll(_ checked: Set<UUID>, shown: [Note]) -> Set<UUID> {
+        let ids = Set(shown.map(\.id))
+        return !ids.isEmpty && ids.isSubset(of: checked) ? [] : ids
+    }
+
+    static func deleteTitle(_ n: Int) -> String {
+        n == 0 ? "Удалить" : "Удалить \(n) \(StatsPane.plural(n, "заметку", "заметки", "заметок"))"
+    }
 
     private static func fmt(_ pattern: String) -> DateFormatter {
         let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = pattern; return f
@@ -115,7 +139,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         search.placeholderString = "Поиск по заметкам"
         search.delegate = self
 
-        for (id, width) in [("time", 104.0), ("text", 560.0)] {
+        for (id, width) in [("check", 22.0), ("time", 104.0), ("text", 540.0)] {
             let c = NSTableColumn(identifier: .init(id))
             c.width = width
             c.resizingMask = id == "text" ? .autoresizingMask : []
@@ -131,7 +155,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         table.backgroundColor = .clear
         table.allowsMultipleSelection = true
         let menu = NSMenu()
-        menu.addItem(withTitle: "Удалить", action: #selector(deleteSelected), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Удалить", action: #selector(deleteClicked), keyEquivalent: "").target = self
         table.menu = menu
 
         let scroll = NSScrollView()
@@ -141,13 +165,15 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         scroll.drawsBackground = false
 
         countLabel.textColor = .secondaryLabelColor
-        let tip = NSTextField(labelWithString: "Выделите заметки и нажмите «Удалить» · правый клик — удалить одну")
+        let tip = NSTextField(labelWithString: "Отметьте заметки галочками и нажмите «Удалить» · правый клик — удалить одну")
         tip.textColor = .tertiaryLabelColor
         tip.font = .systemFont(ofSize: 11)
         deleteButton.target = self
         deleteButton.action = #selector(deleteSelected)
         deleteButton.isEnabled = false
-        let bar = NSStackView(views: [countLabel, tip, NSView(), deleteButton])
+        checkAllButton.target = self
+        checkAllButton.action = #selector(checkAllAction)
+        let bar = NSStackView(views: [countLabel, tip, NSView(), checkAllButton, deleteButton])
 
         let stack = NSStackView(views: [hint, search, scroll, bar])
         stack.orientation = .vertical
@@ -177,8 +203,9 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
             }
             rows.append(.note(n))
         }
+        checked = Self.visibleChecks(checked, shown: shown)
         table.reloadData()
-        deleteButton.isEnabled = false
+        updateButtons()
         let q = search.stringValue.trimmingCharacters(in: .whitespaces)
         countLabel.stringValue = all.isEmpty ? "Пока нет заметок"
             : q.isEmpty ? "Заметок: \(all.count)" : "Найдено: \(shown.count) из \(all.count)"
@@ -192,8 +219,31 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        deleteButton.isEnabled = !table.selectedRowIndexes.isEmpty
+    func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }
+
+    private var shownNotes: [Note] {
+        rows.compactMap { if case .note(let n) = $0 { return n } else { return nil } }
+    }
+
+    private func updateButtons() {
+        let shown = shownNotes
+        let n = Self.toDelete(checked: checked, highlighted: selected, shown: shown).count
+        deleteButton.title = Self.deleteTitle(checked.isEmpty ? 0 : n)
+        deleteButton.isEnabled = n > 0
+        checkAllButton.isEnabled = !shown.isEmpty
+        checkAllButton.title = !shown.isEmpty && Set(shown.map(\.id)).isSubset(of: checked) ? "Снять отметки" : "Отметить все"
+    }
+
+    @objc private func checkAllAction() {
+        checked = Self.toggleAll(checked, shown: shownNotes)
+        table.reloadData(forRowIndexes: IndexSet(integersIn: 0..<rows.count), columnIndexes: IndexSet(integer: 0))
+        updateButtons()
+    }
+
+    @objc private func checkToggled(_ sender: NSButton) {
+        guard sender.tag < rows.count, case .note(let n) = rows[sender.tag] else { return }
+        if sender.state == .on { checked.insert(n.id) } else { checked.remove(n.id) }
+        updateButtons()
     }
 
     /// The right-clicked note, or the selection when the click is inside it.
@@ -206,8 +256,15 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         }
     }
 
+    /// Context menu: the right-clicked note (or the highlight it is part of).
+    @objc private func deleteClicked() { confirmDelete(selected) }
+
+    /// «Удалить» button: the ticked notes, or the highlighted ones when nothing is ticked.
     @objc private func deleteSelected() {
-        let notes = selected
+        confirmDelete(Self.toDelete(checked: checked, highlighted: selected, shown: shownNotes))
+    }
+
+    private func confirmDelete(_ notes: [Note]) {
         guard !notes.isEmpty else { return }
         let a = NSAlert()
         a.messageText = notes.count == 1 ? "Удалить заметку?"
@@ -217,6 +274,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         a.addButton(withTitle: "Отмена")
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return }
+        checked.subtract(notes.map(\.id))
         Notes.shared.remove(ids: Set(notes.map(\.id)))
     }
 
@@ -230,6 +288,21 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
     }
 
     func tableView(_ tableView: NSTableView, viewFor col: NSTableColumn?, row: Int) -> NSView? {
+        if col?.identifier.rawValue == "check" {
+            guard case .note(let n) = rows[row] else { return nil }
+            let box = NSButton(checkboxWithTitle: "", target: self, action: #selector(checkToggled(_:)))
+            box.tag = row
+            box.state = checked.contains(n.id) ? .on : .off
+            box.setAccessibilityLabel("Отметить заметку")
+            let cell = NSView()
+            box.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(box)
+            NSLayoutConstraint.activate([
+                box.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                box.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8),
+            ])
+            return cell
+        }
         let cell = NSTableCellView()
         let t = NSTextField(wrappingLabelWithString: "")
         t.translatesAutoresizingMaskIntoConstraints = false

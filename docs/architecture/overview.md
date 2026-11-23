@@ -28,7 +28,7 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with «Скопировать» |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
-| `Notes.swift` | `NoteCommand` (is this dictation «Заметка …»?), `Notes` (`notes.json`, newest first, 5000 max), `NotesPane` (Заметки page: by day, search, delete), `NoteSavedCard` |
+| `Notes.swift` | `NoteCommand` (is this dictation «Заметка …»?), `Notes` (`notes.json`, newest first, 5000 max), `NotesPane` (Заметки page: by day, search, checkboxes and bulk delete), `NoteSavedCard` |
 | `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
 | `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
