@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-23
 ---
 
 # JustTellMe — Agent & Contributor Guide
@@ -9,7 +9,7 @@ updated: 2026-11-11
 JustTellMe is a local push-to-talk dictation app for macOS on Apple Silicon. It replaces Wispr Flow.
 You hold Fn (or right ⌥) and speak; when you release, the text is pasted where the cursor is.
 Speech is recognised entirely on the Mac by whisper.cpp (large-v3-turbo). Russian and English work,
-including Russian speech with English terms. It lives in the menu bar and has one main window.
+including Russian speech with English terms. It lives in the menu bar and has one main window. A dictation that starts with «Заметка» is saved as a note instead of being pasted.
 
 ## Documentation map
 
@@ -47,7 +47,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--stream file.wav` plays the file in real time through the streaming path and prints the wait after "release"
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
-- `--demo-overlay [out.png]`, `--demo-window out-prefix` and `--demo-card out.png` render the overlay, every page of the main window or the «Курсор не в поле ввода?» card to PNG
+- `--demo-overlay [out.png]`, `--demo-window out-prefix`, `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the «Курсор не в поле ввода?» card or the «Заметка сохранена» card to PNG
 - `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings; `--idle-unload file.wav` checks the idle timer
 - `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
 - `--update-check [--page]`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app [--zip file.zip --version X]` drive the updater

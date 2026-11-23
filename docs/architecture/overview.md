@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-12
+updated: 2026-11-23
 ---
 
 # Overview
@@ -28,6 +28,7 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with «Скопировать» |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
+| `Notes.swift` | `NoteCommand` (is this dictation «Заметка …»?), `Notes` (`notes.json`, newest first, 5000 max), `NotesPane` (Заметки page: by day, search, delete), `NoteSavedCard` |
 | `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
 | `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
@@ -60,12 +61,17 @@ sequenceDiagram
     S->>W: transcribe remainder
     W-->>S: text (cleanup, replacements, casing)
     S-->>A: joined text + language
-    A->>A: History.add
-    A->>P: insert (clipboard promise + ⌘V, restore after read)
-    A-->>A: FocusedField (background): no text field → NoFieldCard
+    alt text starts with «Заметка»
+        A->>A: Notes.add (rest of the phrase) → NoteSavedCard, nothing pasted
+    else
+        A->>A: History.add
+        A->>P: insert (clipboard promise + ⌘V, restore after read)
+        A-->>A: FocusedField (background): no text field → NoFieldCard
+    end
 ```
 
 Notes:
+- A result whose first word is «Заметка» goes to `Notes`, not to the frontmost app or `History` ([ADR 009](decisions/009-voice-notes-by-keyword.md)).
 - Pieces run one at a time on the transcriber's serial queue. The language and prompt for a piece are decided on
   that queue, so they always see the previous piece's result. A piece that follows an English piece is decoded as English.
 - `auto` decodes as Russian, with no separate detection pass. The language label comes from the script, counting words.
@@ -80,11 +86,13 @@ Notes:
 ```mermaid
 flowchart LR
     MW[MainWindow<br/>sidebar] --> H[HomePane<br/>status · quick stats · feed]
+    MW --> N[NotesPane<br/>by day · search · delete]
     MW --> ST[StatsPane]
     MW --> V[VocabularyPane]
     MW --> SE[SettingsPane]
     SE -- SettingsHost --> AD[AppDelegate]
     HI[(History)] -- onChange --> MW
+    NO[(Notes)] -- onChange --> N
     AD -- appStatus --> H
 ```
 
@@ -107,6 +115,6 @@ See [ADR 007](decisions/007-updates-from-github-releases.md).
 
 ## Data on disk
 
-`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `dictionary.txt`,
+`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `notes.json`, `dictionary.txt`,
 `replacements.txt`, `prompt.txt` (only when customised), `Models/` (downloaded models and Core ML encoders).
 See [security/](../security/index.md).

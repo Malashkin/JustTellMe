@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-23
 ---
 
 # Privacy & security

@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-12
+updated: 2026-11-23
 ---
 
 # Changelog
