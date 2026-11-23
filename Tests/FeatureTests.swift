@@ -49,6 +49,33 @@ enum FeatureTests {
             T.eq(Notes.filter(store.entries, query: "").count, store.entries.count)
             T.ok(FileManager.default.fileExists(atPath: Paths.support.appendingPathComponent("notes.json").path), "stored in the support folder")
         }
+        T.test("notes: deleting removes exactly the chosen notes, and stays deleted after a reload") {
+            let store = Notes.shared
+            let keep = store.add(text: "Оставить", lang: "ru")
+            let a = store.add(text: "Удалить первую", lang: "ru")
+            let b = store.add(text: "Удалить вторую", lang: "ru")
+            let before = store.entries.count
+            store.remove(ids: [a.id, b.id])
+            store.load()
+            T.eq(store.entries.count, before - 2)
+            T.ok(!store.entries.contains { $0.id == a.id || $0.id == b.id }, "deleted notes are gone from the file")
+            T.ok(store.entries.contains { $0.id == keep.id }, "other notes stay")
+            var changed = false
+            store.onChange = { changed = true }
+            defer { store.onChange = nil }
+            store.remove(ids: [UUID()])
+            T.eq(store.entries.count, before - 2, "an unknown id deletes nothing")
+            T.ok(!changed, "nothing to delete, nothing rewritten")
+        }
+        T.test("notes: grouped by day, every header and every note shows the date") {
+            let cal = Calendar.current
+            let now = cal.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 12))!
+            T.eq(NotesPane.dayTitle(now, now: now), "Сегодня, 23 ноября")
+            T.eq(NotesPane.dayTitle(cal.date(byAdding: .day, value: -1, to: now)!, now: now), "Вчера, 22 ноября")
+            T.eq(NotesPane.dayTitle(cal.date(byAdding: .day, value: -3, to: now)!, now: now), "20 ноября 2026, пятница")
+            let s = NotesPane.stamp(cal.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 9, minute: 5))!)
+            T.ok(s.hasPrefix("23 ") && s.hasSuffix(", 09:05"), "date and time on the note, got \(s)")
+        }
         T.test("notes: the main window has a Заметки page right after Главная") {
             T.eq(MainWindow.Page.notes.rawValue, MainWindow.Page.home.rawValue + 1)
             T.eq(MainWindow.Page.notes.title, "Заметки")

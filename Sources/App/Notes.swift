@@ -58,6 +58,12 @@ final class Notes {
         return n
     }
 
+    func remove(ids: Set<UUID>) {
+        guard entries.contains(where: { ids.contains($0.id) }) else { return }
+        entries.removeAll { ids.contains($0.id) }
+        save()
+    }
+
     /// Notes whose text contains `query` (case-insensitive); all notes for an empty query.
     static func filter(_ notes: [Note], query: String) -> [Note] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -80,14 +86,26 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
     private let table = NSTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
+    private let deleteButton = NSButton(title: "Удалить", target: nil, action: nil)
     private var rows: [Row] = []
 
-    private static let timeFmt: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = "HH:mm"; return f
-    }()
-    private static let dayFmt: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = "d MMMM yyyy, EEEE"; return f
-    }()
+    private static func fmt(_ pattern: String) -> DateFormatter {
+        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = pattern; return f
+    }
+    private static let stampFmt = fmt("d MMM, HH:mm")
+    private static let dayFmt = fmt("d MMMM yyyy, EEEE")
+    private static let shortDayFmt = fmt("d MMMM")
+
+    /// Day header: always shows the date, «Сегодня»/«Вчера» in front of it.
+    static func dayTitle(_ day: Date, now: Date = Date()) -> String {
+        let cal = Calendar.current
+        if cal.isDate(day, inSameDayAs: now) { return "Сегодня, " + shortDayFmt.string(from: day) }
+        if let y = cal.date(byAdding: .day, value: -1, to: now), cal.isDate(day, inSameDayAs: y) { return "Вчера, " + shortDayFmt.string(from: day) }
+        return dayFmt.string(from: day)
+    }
+
+    /// Date and time shown on every note, e.g. «23 нояб., 10:04».
+    static func stamp(_ date: Date) -> String { stampFmt.string(from: date) }
 
     private func build() -> NSView {
         let hint = NSTextField(wrappingLabelWithString: "Начните фразу со слова «Заметка» — например, «Заметка: позвонить в банк». "
@@ -97,7 +115,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         search.placeholderString = "Поиск по заметкам"
         search.delegate = self
 
-        for (id, width) in [("time", 48.0), ("text", 600.0)] {
+        for (id, width) in [("time", 104.0), ("text", 560.0)] {
             let c = NSTableColumn(identifier: .init(id))
             c.width = width
             c.resizingMask = id == "text" ? .autoresizingMask : []
@@ -111,6 +129,10 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         table.floatsGroupRows = false
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.backgroundColor = .clear
+        table.allowsMultipleSelection = true
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Удалить", action: #selector(deleteSelected), keyEquivalent: "").target = self
+        table.menu = menu
 
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -119,13 +141,20 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         scroll.drawsBackground = false
 
         countLabel.textColor = .secondaryLabelColor
+        let tip = NSTextField(labelWithString: "Выделите заметки и нажмите «Удалить» · правый клик — удалить одну")
+        tip.textColor = .tertiaryLabelColor
+        tip.font = .systemFont(ofSize: 11)
+        deleteButton.target = self
+        deleteButton.action = #selector(deleteSelected)
+        deleteButton.isEnabled = false
+        let bar = NSStackView(views: [countLabel, tip, NSView(), deleteButton])
 
-        let stack = NSStackView(views: [hint, search, scroll, countLabel])
+        let stack = NSStackView(views: [hint, search, scroll, bar])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
         stack.edgeInsets = NSEdgeInsets(top: 14, left: 20, bottom: 14, right: 20)
-        for v in [hint, search, scroll, countLabel] as [NSView] {
+        for v in [hint, search, scroll, bar] as [NSView] {
             v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
         scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -144,11 +173,12 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
             let d = cal.startOfDay(for: n.date)
             if d != lastDay {
                 lastDay = d
-                rows.append(.day(cal.isDateInToday(d) ? "Сегодня" : cal.isDateInYesterday(d) ? "Вчера" : Self.dayFmt.string(from: d)))
+                rows.append(.day(Self.dayTitle(d)))
             }
             rows.append(.note(n))
         }
         table.reloadData()
+        deleteButton.isEnabled = false
         let q = search.stringValue.trimmingCharacters(in: .whitespaces)
         countLabel.stringValue = all.isEmpty ? "Пока нет заметок"
             : q.isEmpty ? "Заметок: \(all.count)" : "Найдено: \(shown.count) из \(all.count)"
@@ -161,6 +191,34 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        deleteButton.isEnabled = !table.selectedRowIndexes.isEmpty
+    }
+
+    /// The right-clicked note, or the selection when the click is inside it.
+    private var selected: [Note] {
+        let idx = table.clickedRow >= 0 && !table.selectedRowIndexes.contains(table.clickedRow)
+            ? IndexSet(integer: table.clickedRow) : table.selectedRowIndexes
+        return idx.compactMap { i in
+            guard i < rows.count, case .note(let n) = rows[i] else { return nil }
+            return n
+        }
+    }
+
+    @objc private func deleteSelected() {
+        let notes = selected
+        guard !notes.isEmpty else { return }
+        let a = NSAlert()
+        a.messageText = notes.count == 1 ? "Удалить заметку?"
+            : "Удалить \(notes.count) \(StatsPane.plural(notes.count, "заметку", "заметки", "заметок"))?"
+        a.informativeText = notes.count == 1 ? "«\(notes[0].text.prefix(120))»\n\nЭто нельзя отменить." : "Это нельзя отменить."
+        a.addButton(withTitle: "Удалить")
+        a.addButton(withTitle: "Отмена")
+        a.buttons.first?.hasDestructiveAction = true
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        Notes.shared.remove(ids: Set(notes.map(\.id)))
+    }
 
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
         if case .day = rows[row] { return true }
@@ -187,7 +245,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
             top = 14
         case .note(let n):
             if col?.identifier.rawValue == "time" {
-                t.stringValue = Self.timeFmt.string(from: n.date)
+                t.stringValue = Self.stamp(n.date)
                 t.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
                 t.textColor = .tertiaryLabelColor
                 top = 7

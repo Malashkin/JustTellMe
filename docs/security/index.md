@@ -31,7 +31,7 @@ it is refused with the reason. See [ADR 007](../architecture/decisions/007-updat
 
 | File | Contents | Removed by |
 |---|---|---|
-| `notes.json` | Voice notes («Заметка …»): text, time, language (max 5000) | Delete the file |
+| `notes.json` | Voice notes («Заметка …»): text, time, language (max 5000) | «Удалить» on Заметки |
 | `history.json` | Every dictation: text, time, language, app, length (max 2000) | «Очистить всё…» / «Удалить» on Главная |
 | `dictionary.txt`, `replacements.txt` | Personal terms and fixes | Словарь page |
 | `prompt.txt` | Custom prompt (only if changed) | «Подсказка по умолчанию» |

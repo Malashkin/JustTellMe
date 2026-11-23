@@ -34,7 +34,7 @@ Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → «Откр�
 | Page | What's there |
 |---|---|
 | **Главная** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Search; double-click to copy; right-click to fix or delete; «Очистить всё…». |
-| **Заметки** | Voice notes, newest first, grouped by day, with time and search. |
+| **Заметки** | Voice notes, newest first, grouped by day (headers «Сегодня, 23 ноября», «Вчера, 22 ноября», then full dates); each note shows its date and time. Search. Select notes and press «Удалить», or right-click → «Удалить» (asks first). |
 | **Статистика** | Today / 7 / 30 days / all time: words, characters, dictations, speaking time, words per minute, time saved (typing at 40 wpm minus speaking time); words-per-day chart; apps; languages; streak |
 | **Словарь** | Prompt, personal dictionary, personal replacements (`wrong => right`), on/off toggle for the read-only built-in dictionary |
 | **Настройки** | All settings, see [settings.md](settings.md) |
