@@ -25,7 +25,7 @@ The text is pasted with ⌘V. Your clipboard is restored right after the target 
 
 ## Voice notes
 
-Start a dictation with the word «Заметка» and the rest of the phrase becomes a note: nothing is pasted into the frontmost app. «Заметка, купить молоко.» saves «Купить молоко.». Only the word at the very start counts, as a whole word: «Это заметка про отпуск» and «Заметками займусь завтра» are pasted as usual. «Заметка» alone saves nothing and beeps. A card «Заметка сохранена» shows the text for 4 s with «Открыть заметки». Notes are not part of the Главная feed or the stats.
+Start a dictation with the word «Заметка» and the rest of the phrase becomes a note: nothing is pasted into the frontmost app. «Заметка, купить молоко.» saves «Купить молоко.». The recogniser may get the word slightly wrong, so one wrong, missing or extra letter is accepted («Замевка», «Заметко», «Заметку»), and so is the word split in two («За метка»). Real words one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка») never count. Only the word at the very start counts, as a whole word: «Это заметка про отпуск» and «Заметками займусь завтра» are pasted as usual. «Заметка» alone saves nothing and beeps. A card «Заметка сохранена» shows the text for 4 s with «Открыть заметки». Notes are not part of the Главная feed or the stats.
 
 ## Main window
 

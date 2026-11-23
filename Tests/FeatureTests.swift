@@ -33,6 +33,28 @@ enum FeatureTests {
             T.eq(NoteCommand.body(of: "Купить молоко"), nil)
             T.eq(NoteCommand.body(of: ""), nil)
         }
+        T.test("notes: a slightly misheard keyword still makes a note (one letter off, or split in two)") {
+            T.eq(NoteCommand.body(of: "Замевка купить молоко."), "Купить молоко.")
+            T.eq(NoteCommand.body(of: "Заметко, позвонить в банк"), "Позвонить в банк")
+            T.eq(NoteCommand.body(of: "Саметка: созвон в 15:00."), "Созвон в 15:00.")
+            T.eq(NoteCommand.body(of: "Заметька. Идея для статьи"), "Идея для статьи")
+            T.eq(NoteCommand.body(of: "Замтка забрать посылку"), "Забрать посылку")
+            T.eq(NoteCommand.body(of: "Заметку купить хлеб"), "Купить хлеб")
+            T.eq(NoteCommand.body(of: "За метка, купить сыр"), "Купить сыр")
+            T.eq(NoteCommand.body(of: "За мефка купить молоко."), "Купить молоко.", "real whisper output for a TTS «Замевка»")
+        }
+        T.test("notes: ordinary words that only look like the keyword are pasted as usual") {
+            T.eq(NoteCommand.body(of: "Заметна разница в скорости."), nil)
+            T.eq(NoteCommand.body(of: "Заметно быстрее стало."), nil)
+            T.eq(NoteCommand.body(of: "Заметил ошибку в отчёте."), nil)
+            T.eq(NoteCommand.body(of: "Замечательно, договорились."), nil)
+            T.eq(NoteCommand.body(of: "Монетка упала."), nil)
+            T.eq(NoteCommand.body(of: "За меткой следи."), nil)
+            T.eq(NoteCommand.body(of: "За"), nil)
+            T.eq(NoteCommand.body(of: "Заметках этого нет."), nil)
+            T.eq(NoteCommand.body(of: "Зачётка осталась дома."), nil)
+            T.eq(NoteCommand.body(of: "Намётка плана готова."), nil)
+        }
         T.test("notes: the keyword alone gives an empty note, which is not pasted either") {
             T.eq(NoteCommand.body(of: "Заметка."), "")
             T.eq(NoteCommand.body(of: "Заметка"), "")

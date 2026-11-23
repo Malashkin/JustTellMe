@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ### Added
 - **Voice notes.** Start a dictation with the word «Заметка» («Заметка: позвонить в банк») and the rest is saved as a note instead of being pasted. A card «Заметка сохранена» confirms it, with a button to open the notes. Notes live on the new page Заметки in the main window: newest first, grouped by day, with search. Only the word at the very start counts («Это заметка про…» is pasted as usual); «Заметка» alone saves nothing. Notes are kept in `notes.json` and are not counted in the dictation feed or the stats.
+- **A misheard «Заметка» still makes a note.** The first word may be one letter off («Замевка», «Заметко», «Саметка», «Заметку») or split in two («За метка», «За мефка»). Real words that are one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка») are pasted as usual.
 - **Dates on notes.** Day headers always show the date («Сегодня, 23 ноября»), and every note shows its date and time.
 - **Deleting notes.** Tick notes with the checkbox in front of each one (or «Отметить все») and press «Удалить N заметок» to delete them at once; right-click a note → «Удалить» removes just that one. A confirmation is asked first. Ticks on notes hidden by the search are dropped, so nothing invisible is deleted.
 - `--demo-note-card out.png` renders the «Заметка сохранена» card.

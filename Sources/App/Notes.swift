@@ -10,25 +10,75 @@ struct Note: Codable, Equatable {
 }
 
 /// Recognises the spoken command «Заметка …» at the very start of a dictation.
+/// The recogniser sometimes gets the word slightly wrong («Замевка», «Заметко», «За метка»), so the first word
+/// may be one letter off; real words that are one letter off are listed in `lookalikes` and never count.
 enum NoteCommand {
     static let keyword = "заметка"
+    /// Ordinary words one letter away from the keyword: a phrase starting with them is not a note.
+    static let lookalikes: Set<String> = ["заметна", "заметкам", "заметках", "зачетка", "наметка"]
 
-    /// The note text when `text` starts with the keyword as a whole word, else nil.
-    /// «Заметка, купить молоко.» → «Купить молоко.»; «Заметка.» → ""; «Заметками …» and «Это заметка …» → nil.
+    /// The note text when `text` starts with the keyword (or a near miss of it) as a whole word, else nil.
+    /// «Заметка, купить молоко.» → «Купить молоко.»; «Замевка купить молоко» → «Купить молоко»;
+    /// «Заметка.» → ""; «Заметками …», «Заметна …» and «Это заметка …» → nil.
     static func body(of text: String) -> String? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-        guard t.count >= keyword.count,
-              t.prefix(keyword.count).lowercased() == keyword else { return nil }
-        let rest = t.dropFirst(keyword.count)
-        if let next = rest.first, next.isLetter || next.isNumber { return nil }
+        let words = leadingWords(t, count: 2)
+        guard let first = words.first else { return nil }
+        var restStart: String.Index?
+        if matches(first.word) {
+            restStart = first.end
+        } else if words.count == 2, first.word.count <= 3, matches(first.word + words[1].word) {
+            restStart = words[1].end   // «За метка …»
+        }
+        guard let from = restStart else { return nil }
         let leading = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters).union(CharacterSet(charactersIn: "—–-"))
-        var body = String(rest).trimmingCharacters(in: leading)
-        // Keep the closing punctuation the recogniser put after the note itself.
+        var body = String(t[from...]).trimmingCharacters(in: leading)
         if body.isEmpty { return "" }
+        // Keep the closing punctuation the recogniser put after the note itself.
         if let last = text.trimmingCharacters(in: .whitespacesAndNewlines).last, ".!?…".contains(last), !".!?…".contains(body.last!) {
             body.append(last)
         }
         return body.prefix(1).uppercased() + body.dropFirst()
+    }
+
+    /// Is `word` the keyword, or one letter off it (and not a real word that merely looks like it)?
+    static func matches(_ word: String) -> Bool {
+        let w = word.lowercased().replacingOccurrences(of: "ё", with: "е")
+        if w == keyword { return true }
+        guard !lookalikes.contains(w), abs(w.count - keyword.count) <= 1 else { return false }
+        return editDistance(w, keyword, limit: 1) <= 1
+    }
+
+    /// The first `count` words (letters and digits) and where each ends.
+    private static func leadingWords(_ s: String, count: Int) -> [(word: String, end: String.Index)] {
+        var out: [(String, String.Index)] = []
+        var i = s.startIndex
+        while out.count < count, i < s.endIndex {
+            while i < s.endIndex, !(s[i].isLetter || s[i].isNumber) {
+                // Only spaces may separate the two halves of «За метка»; punctuation ends the search.
+                if !out.isEmpty && !s[i].isWhitespace { return out }
+                i = s.index(after: i)
+            }
+            let begin = i
+            while i < s.endIndex, s[i].isLetter || s[i].isNumber { i = s.index(after: i) }
+            if begin < i { out.append((String(s[begin..<i]), i)) }
+        }
+        return out
+    }
+
+    /// Levenshtein distance, giving up (returning limit + 1) once it exceeds `limit`.
+    static func editDistance(_ a: String, _ b: String, limit: Int) -> Int {
+        let a = Array(a), b = Array(b)
+        var prev = Array(0...b.count)
+        for i in 1...max(a.count, 1) where !a.isEmpty {
+            var cur = [i] + Array(repeating: 0, count: b.count)
+            for j in 1...max(b.count, 1) where !b.isEmpty {
+                cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1))
+            }
+            if cur.min()! > limit { return limit + 1 }
+            prev = cur
+        }
+        return a.isEmpty ? b.count : prev[b.count]
     }
 }
 
