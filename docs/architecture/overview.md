@@ -34,6 +34,7 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
 | `SettingsPane.swift` | Settings page; `SettingsHost` protocol implemented by `AppDelegate` |
 | `Windows.swift` | `VocabularyPane` (Dictionary page), `CorrectionWindow` (fix and remember), `SelectableTextTableView` (text in the feed and notes can be selected with the mouse; ⌘C copies highlighted rows) |
+| `Glass.swift` | The Liquid Glass look ([ADR 012](decisions/012-liquid-glass-design.md)): `Glass` (colors, behind-window backdrop with a rounded mask, glass cards, search capsule), `GlassView`, `CapsuleButton`, `CapsuleSegments`, `CapsuleRowView` (capsule selection in tables), `glassPopup` |
 | `Overlay.swift` | The recording pill; `WaveView` draws 18 CALayer bars at 30 fps |
 | `Settings.swift` | `Prefs`, CoreAudio helpers, `SystemMute`, `SecureInput` |
 | `Models.swift` | Bundled, imported and downloaded models; the active model |

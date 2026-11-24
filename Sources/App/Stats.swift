@@ -232,9 +232,9 @@ final class StatCard: NSView {
     init(title: String) {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 10
-        let t = NSTextField(labelWithString: title.uppercased())
-        t.font = .systemFont(ofSize: 11, weight: .semibold)
+        layer?.cornerRadius = 18
+        let t = NSTextField(labelWithString: title)
+        t.font = .systemFont(ofSize: 12, weight: .medium)
         t.textColor = .secondaryLabelColor
         valueLabel.font = .systemFont(ofSize: 24, weight: .semibold)
         let s = NSStackView(views: [t, valueLabel])
@@ -252,7 +252,11 @@ final class StatCard: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    override func updateLayer() { layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.12).cgColor }
+    override func updateLayer() {
+        layer?.backgroundColor = cg(Glass.fill)
+        layer?.borderColor = cg(Glass.edge)
+        layer?.borderWidth = 1
+    }
     override var wantsUpdateLayer: Bool { true }
 }
 

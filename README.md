@@ -18,6 +18,7 @@ Neural Engine: no cloud, no account, no subscription. Recognition is tuned for R
 
 - **Dictate into any app.** Push-to-talk on Fn (🌐) or right ⌥, or double-tap for hands-free. The text appears about a second after you let go.
 - **Voice lists.** Start a phrase with a command word and it is saved instead of pasted: notes, tasks with Backlog/Done and due dates, or any list you create.
+- **Liquid Glass design.** The desktop shows through the window; panels, cards and controls are glass capsules, in Light and Dark mode.
 - **Private by design.** Audio and text never leave the Mac. The large-v3-turbo model ships inside the app.
 - **Light on resources.** The model leaves memory when you are idle and comes back in half a second while you speak.
 - **Learns your words.** A personal dictionary, replacement rules, and “Correct and Remember…” that learns from your fixes.
@@ -223,7 +224,7 @@ The binary `JustTellMe.app/Contents/MacOS/JustTellMe` accepts hidden flags:
 - `--update-stage file.zip [--version X]`
 - `--update-install other/JustTellMe.app`
 
-`JTM_LANG=en|ru` forces the interface language. `JTM_SUPPORT_DIR=/path` uses another data folder.
+`JTM_LANG=en|ru` forces the interface language. `JTM_DEMO_DELAY=<seconds>` keeps each `--demo-window` page on screen longer. `JTM_SUPPORT_DIR=/path` uses another data folder.
 
 ### Project layout
 

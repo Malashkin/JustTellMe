@@ -59,6 +59,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 ## Coding conventions
 
 - Plain AppKit built in code: no nibs, no SwiftUI, no SwiftPM or Xcode project. `build.sh` compiles `Sources/App/*.swift` with `swiftc`.
+- UI uses the glass components from `Sources/App/Glass.swift` (`GlassView`, `CapsuleButton`, `CapsuleSegments`, `Glass.card`, `Glass.searchCapsule`); colors that change with Light/Dark mode go to layers through `cg(_:)`.
 - Match the surrounding style: short doc comments (`///`) on types and non-obvious functions, `NSStackView` layouts, closures for callbacks (`onChange`, `onFix`, …).
 - User-facing text is English with a Russian translation: wrap it in `tr("English", "Русский")` (`Sources/App/L10n.swift`); counts use `L10n.plural`, dates `L10n.formatter`. Code, comments and commit messages are English.
 - Preferences go through `Prefs` (`Sources/App/Settings.swift`). A setting appears both in the menu-bar Settings submenu and on the Settings page (`SettingsPane`), so keep the two in sync.
@@ -67,7 +68,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 
 ## README screenshots
 
-`docs/images/*.png` are rendered from sample data, never from real history: `JTM_LANG=en JTM_SUPPORT_DIR=<folder with sample lists.json, list-*.json, history.json> JustTellMe --demo-window out --ok`, plus `--demo-note-card` and `--demo-overlay`, then resized to 1600 px wide (`sips -Z 1600`). Dates in sample JSON must have no fractional seconds.
+`docs/images/*.png` are rendered from sample data, never from real history: `JTM_LANG=en JTM_SUPPORT_DIR=<folder with sample lists.json, list-*.json, history.json> JustTellMe --demo-window out --ok`, plus `--demo-note-card` and `--demo-overlay`, then resized to 1600 px wide (`sips -Z 1600`). Off-screen renders can't show the blurred desktop, so `--demo-window` draws the glass over a sample wallpaper; the pill and cards render grey that way. Dates in sample JSON must have no fractional seconds.
 
 ## Do not edit / generated zones
 

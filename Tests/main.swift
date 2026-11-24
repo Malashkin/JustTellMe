@@ -8,6 +8,7 @@ UnitTests.run()
 FeatureTests.run()
 IntegrationTests.run()
 LocalizationTests.run()
+GlassTests.run()
 
 print("")
 print("passed: \(T.passed), failed: \(T.failed.count), skipped: \(T.skipped.count), \(String(format: "%.1f", Date().timeIntervalSince(started)))s")

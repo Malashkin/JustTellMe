@@ -89,7 +89,7 @@ struct SpokenKeyword {
 final class SavedCard: NSObject {
     var onOpen: (() -> Void)?
     private let title = NSTextField(labelWithString: "")
-    private let open = NSButton(title: "", target: nil, action: nil)
+    private let open = CapsuleButton("", style: .prominent)
 
     private var panel: NSPanel?
     private let body = NSTextField(wrappingLabelWithString: "")
@@ -141,27 +141,22 @@ final class SavedCard: NSObject {
         p.becomesKeyOnlyIfNeeded = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
-        let bg = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        bg.material = .popover
-        bg.state = .active
-        bg.wantsLayer = true
-        bg.layer?.cornerRadius = 12
-        bg.layer?.masksToBounds = true
+        let bg = Glass.backdrop(.popover, radius: 22)
+        bg.frame = NSRect(origin: .zero, size: size)
 
-        let w = size.width - 28
+        let w = size.width - 36
         title.font = .systemFont(ofSize: 13, weight: .semibold)
-        title.frame = NSRect(x: 14, y: size.height - 30, width: w, height: 18)
+        title.frame = NSRect(x: 18, y: size.height - 30, width: w, height: 18)
         body.font = .systemFont(ofSize: 12)
         body.textColor = .secondaryLabelColor
         body.maximumNumberOfLines = 2
         body.cell?.truncatesLastVisibleLine = true
         body.lineBreakMode = .byWordWrapping
-        body.frame = NSRect(x: 14, y: 40, width: w, height: 32)
+        body.frame = NSRect(x: 18, y: 40, width: w, height: 32)
         open.target = self
         open.action = #selector(openAction)
-        open.bezelStyle = .rounded
-        open.frame = NSRect(x: size.width - 14 - 150, y: 6, width: 150, height: 30)
-        for v in [title, body, open] as [NSView] { bg.addSubview(v) }
+        open.frame = NSRect(x: size.width - 12 - 160, y: 10, width: 160, height: 30)
+        for v in [title, body, open] as [NSView] { bg.addSubview(v, positioned: .below, relativeTo: nil) }
         p.contentView = bg
         return p
     }

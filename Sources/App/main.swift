@@ -146,7 +146,7 @@ if let out = opt("--demo-window") {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
         w.present(p)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Double(ProcessInfo.processInfo.environment["JTM_DEMO_DELAY"] ?? "") ?? 0.8)) {
             w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
             n += 1
             next()

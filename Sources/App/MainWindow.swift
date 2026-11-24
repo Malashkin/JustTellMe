@@ -43,6 +43,8 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
     private var window: NSWindow?
     private let sidebar = NSTableView()
     private let content = NSView()
+    /// The blurred desktop behind everything.
+    private let backdrop = Glass.backdrop()
     private var timer: Timer?
     private var items: [Item] = []
     private(set) var current: Item = .page(.home)
@@ -141,9 +143,9 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         case .page(let p):
             switch p {
             case .home: home.reload(); home.refreshStatus(); pane = home.view
-            case .stats: stats.reload(); pane = stats.view
-            case .vocabulary: vocabulary.reload(); pane = vocabulary.view
-            case .settings: settings.reload(); pane = settings.view
+            case .stats: stats.reload(); pane = titled(p, stats.view)
+            case .vocabulary: vocabulary.reload(); pane = titled(p, vocabulary.view)
+            case .settings: settings.reload(); pane = titled(p, settings.view)
             }
             if p != .home { title = p.title }
         case .list(let id):
@@ -162,46 +164,88 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         NSLayoutConstraint.activate([
             pane.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             pane.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            pane.topAnchor.constraint(equalTo: content.safeAreaLayoutGuide.topAnchor),
+            pane.topAnchor.constraint(equalTo: content.topAnchor, constant: 22),
             pane.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
     }
 
+    private var titledPanes: [Page: NSView] = [:]
+
+    /// A page with a large title on top, like Home and the lists.
+    private func titled(_ p: Page, _ pane: NSView) -> NSView {
+        if let v = titledPanes[p] { return v }
+        let t = NSTextField(labelWithString: p.title)
+        t.font = .systemFont(ofSize: 28, weight: .bold)
+        let v = NSView()
+        for x in [t, pane] { x.translatesAutoresizingMaskIntoConstraints = false; v.addSubview(x) }
+        NSLayoutConstraint.activate([
+            t.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 20),
+            t.topAnchor.constraint(equalTo: v.topAnchor, constant: 8),
+            pane.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            pane.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+            pane.topAnchor.constraint(equalTo: t.bottomAnchor, constant: 2),
+            pane.bottomAnchor.constraint(equalTo: v.bottomAnchor),
+        ])
+        titledPanes[p] = v
+        return v
+    }
+
     private func build() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 700),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                          backing: .buffered, defer: false)
         w.isReleasedWhenClosed = false
-        w.minSize = NSSize(width: 820, height: 600)
+        w.minSize = NSSize(width: 860, height: 600)
         w.delegate = self
+        // Liquid Glass: no title bar, the desktop shows through the whole window.
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.isOpaque = false
+        w.backgroundColor = .clear
         w.setFrameAutosaveName("JustTellMeMain")
         if !w.setFrameUsingName("JustTellMeMain") { w.center() }
 
         let col = NSTableColumn(identifier: .init("page"))
         sidebar.addTableColumn(col)
         sidebar.headerView = nil
-        sidebar.style = .sourceList
-        sidebar.rowHeight = 30
+        sidebar.style = .plain
+        sidebar.backgroundColor = .clear
+        sidebar.selectionHighlightStyle = .regular
+        sidebar.intercellSpacing = NSSize(width: 0, height: 2)
+        sidebar.rowHeight = 34
         sidebar.dataSource = self
         sidebar.delegate = self
         let sideScroll = NSScrollView()
         sideScroll.documentView = sidebar
         sideScroll.drawsBackground = false
-        let sideVC = NSViewController()
-        sideVC.view = sideScroll
+        sideScroll.automaticallyAdjustsContentInsets = false
+        // Room for the window buttons, which sit on the sidebar panel.
+        sideScroll.contentInsets = NSEdgeInsets(top: 40, left: 0, bottom: 8, right: 0)
 
-        let contentVC = NSViewController()
-        contentVC.view = content
-
-        let split = NSSplitViewController()
-        let sideItem = NSSplitViewItem(sidebarWithViewController: sideVC)
-        sideItem.minimumThickness = 180
-        sideItem.maximumThickness = 220
-        sideItem.canCollapse = false
-        split.addSplitViewItem(sideItem)
-        split.addSplitViewItem(NSSplitViewItem(viewController: contentVC))
-        w.contentViewController = split
-        w.setContentSize(NSSize(width: 960, height: 700))
+        let root = NSView()
+        backdrop.autoresizingMask = [.width, .height]
+        root.addSubview(backdrop)
+        let side = GlassView(radius: 20)
+        for v in [side, content] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(v) }
+        sideScroll.translatesAutoresizingMaskIntoConstraints = false
+        side.addSubview(sideScroll)
+        NSLayoutConstraint.activate([
+            side.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
+            side.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
+            side.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
+            side.widthAnchor.constraint(equalToConstant: 210),
+            sideScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor, constant: 6),
+            sideScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor, constant: -6),
+            sideScroll.topAnchor.constraint(equalTo: side.topAnchor),
+            sideScroll.bottomAnchor.constraint(equalTo: side.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: side.trailingAnchor, constant: 4),
+            content.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            content.topAnchor.constraint(equalTo: root.topAnchor),
+            content.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+        ])
+        w.contentView = root
+        w.setContentSize(NSSize(width: 1000, height: 700))
+        backdrop.frame = root.bounds
         window = w
     }
 
@@ -222,23 +266,26 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         }
         let cell = NSTableCellView()
         let img = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: title) ?? NSImage())
+        img.symbolConfiguration = .init(pointSize: 14, weight: .medium)
         let t = NSTextField(labelWithString: title)
-        t.font = .systemFont(ofSize: 13)
+        t.font = .systemFont(ofSize: 14)
         t.lineBreakMode = .byTruncatingTail
         if dim { t.textColor = .secondaryLabelColor; img.contentTintColor = .secondaryLabelColor }
         for v in [img, t] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(v) }
         cell.imageView = img
         cell.textField = t
         NSLayoutConstraint.activate([
-            img.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
+            img.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 14),
             img.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             img.widthAnchor.constraint(equalToConstant: 18),
             t.leadingAnchor.constraint(equalTo: img.trailingAnchor, constant: 8),
-            t.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -4),
+            t.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -12),
             t.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
         ])
         return cell
     }
+
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { CapsuleRowView() }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         let row = sidebar.selectedRow
@@ -254,15 +301,28 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         show(item)
     }
 
-    /// Render the window content to PNG (used by --demo-window).
+    /// Render the window content to PNG (used by --demo-window). The blurred desktop can't be captured
+    /// this way, so the glass is drawn over a soft sample wallpaper instead.
     func snapshot(to url: URL) {
         guard let v = window?.contentView else { return }
-        v.wantsLayer = true
-        v.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        if let n = window?.windowNumber { FileHandle.standardError.write("window \(n)\n".data(using: .utf8)!) }
         v.layoutSubtreeIfNeeded()
         guard let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+        backdrop.isHidden = true
         v.cacheDisplay(in: v.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        backdrop.isHidden = false
+        let size = v.bounds.size
+        let out = NSImage(size: size, flipped: false) { rect in
+            NSGradient(colors: [NSColor(calibratedRed: 0.97, green: 0.85, blue: 0.77, alpha: 1),
+                                NSColor(calibratedRed: 0.84, green: 0.86, blue: 0.99, alpha: 1),
+                                NSColor(calibratedRed: 0.80, green: 0.93, blue: 0.93, alpha: 1)])?.draw(in: rect, angle: -35)
+            NSColor.white.withAlphaComponent(0.35).setFill()
+            rect.fill(using: .sourceOver)
+            rep.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            return true
+        }
+        guard let tiff = out.tiffRepresentation, let full = NSBitmapImageRep(data: tiff) else { return }
+        try? full.representation(using: .png, properties: [:])?.write(to: url)
     }
 }
 
@@ -298,18 +358,17 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         problems.spacing = 10
 
         cards = [tr("Today", "Сегодня"), tr("Speed", "Скорость"), tr("Streak", "Серия"), tr("Time Saved", "Сэкономлено")].map { StatCard(title: $0) }
-        let more = NSButton(title: tr("All Statistics →", "Вся статистика →"), target: self, action: #selector(statsAction))
-        more.bezelStyle = .inline
+        let more = CapsuleButton(tr("All Statistics →", "Вся статистика →"), target: self, action: #selector(statsAction))
         let cardRow = NSStackView(views: cards)
         cardRow.distribution = .fillEqually
         cardRow.spacing = 10
 
         search.placeholderString = tr("Search dictations", "Поиск по надиктованному")
         search.delegate = self
-        let feedTitle = NSTextField(labelWithString: tr("DICTATED", "НАДИКТОВАНО"))
-        feedTitle.font = .systemFont(ofSize: 11, weight: .semibold)
-        feedTitle.textColor = .secondaryLabelColor
-        let feedHead = NSStackView(views: [feedTitle, NSView(), more])
+        let feedTitle = NSTextField(labelWithString: tr("Dictated", "Надиктовано"))
+        feedTitle.font = .systemFont(ofSize: 15, weight: .semibold)
+        let feedHead = NSStackView(views: [feedTitle, NSView(), more, Glass.searchCapsule(search, width: 240)])
+        feedHead.spacing = 12
 
         for (id, width) in [("time", 48.0), ("text", 600.0)] {
             let c = NSTableColumn(identifier: .init(id))
@@ -348,21 +407,26 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             "Выделите текст мышью и нажмите ⌘C · двойной клик по времени — скопировать запись · правый клик — исправить или удалить"))
         tip.textColor = .tertiaryLabelColor
         tip.font = .systemFont(ofSize: 11)
-        let clear = NSButton(title: tr("Clear All…", "Очистить всё…"), target: self, action: #selector(clearAll))
+        let clear = CapsuleButton(tr("Clear All…", "Очистить всё…"), style: .destructive, target: self, action: #selector(clearAll))
         let bar = NSStackView(views: [countLabel, tip, NSView(), clear])
 
-        let stack = NSStackView(views: [hint, problems, cardRow, feedHead, search, scroll, bar])
+        let title = NSTextField(labelWithString: tr("Home", "Главная"))
+        title.font = .systemFont(ofSize: 28, weight: .bold)
+        let feed = Glass.card(scroll)
+        table.selectionHighlightStyle = .regular
+        let stack = NSStackView(views: [title, hint, problems, cardRow, feedHead, feed, bar])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
         stack.setCustomSpacing(18, after: cardRow)
-        stack.setCustomSpacing(6, after: feedHead)
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 20, bottom: 14, right: 20)
-        for v in [hint, problems, cardRow, feedHead, search, scroll, bar] as [NSView] {
-            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
+        stack.setCustomSpacing(4, after: title)
+        stack.setCustomSpacing(10, after: feedHead)
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 20, bottom: 16, right: 24)
+        for v in [title, hint, problems, cardRow, feedHead, feed, bar] as [NSView] {
+            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
         }
-        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
-        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+        feed.setContentHuggingPriority(.defaultLow, for: .vertical)
+        feed.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
         return stack
     }
 
@@ -486,6 +550,8 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { CapsuleRowView() }
 
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
         if case .day = rows[row] { return true }

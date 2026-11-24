@@ -21,3 +21,4 @@ Each record explains one choice that isn't obvious from the code. Up: [architect
 | [009](009-voice-notes-by-keyword.md) | Voice notes: the word «Заметка» (Note) at the start, saved instead of pasted | Accepted, extended by 010 |
 | [010](010-configurable-voice-lists.md) | Voice lists: own names and command words, notes or tasks | Accepted |
 | [011](011-interface-follows-system-language.md) | The interface follows the system language: English/Russian pairs via `tr` | Accepted |
+| [012](012-liquid-glass-design.md) | Liquid Glass look built from NSVisualEffectView and layers, not the macOS 26 glass API | Accepted |

@@ -386,12 +386,12 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private let table = SelectableTextTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
-    private let deleteButton = NSButton(title: tr("Delete", "Удалить"), target: nil, action: nil)
-    private let checkAllButton = NSButton(title: tr("Check All", "Отметить все"), target: nil, action: nil)
-    private let doneButton = NSButton(title: "Done", target: nil, action: nil)
-    private let backlogButton = NSButton(title: tr("To Backlog", "В Backlog"), target: nil, action: nil)
-    private let dueButton = NSButton(title: tr("Due Date…", "Срок…"), target: nil, action: nil)
-    private let statusControl = NSSegmentedControl(labels: ListFilter.Status.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+    private let deleteButton = CapsuleButton(tr("Delete", "Удалить"), style: .destructive)
+    private let checkAllButton = CapsuleButton(tr("Check All", "Отметить все"))
+    private let doneButton = CapsuleButton("Done", style: .prominent)
+    private let backlogButton = CapsuleButton(tr("To Backlog", "В Backlog"))
+    private let dueButton = CapsuleButton(tr("Due Date…", "Срок…"))
+    private let statusControl = CapsuleSegments(ListFilter.Status.allCases.map(\.title))
     private let fieldPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let periodPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fromPicker = NSDatePicker()
@@ -455,21 +455,21 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     // MARK: building
 
     private func build() -> NSView {
-        titleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
-        let configure = NSButton(title: tr("Edit List…", "Настроить…"), target: self, action: #selector(configureAction))
-        configure.bezelStyle = .rounded
-        let head = NSStackView(views: [titleLabel, NSView(), configure])
+        titleLabel.font = .systemFont(ofSize: 28, weight: .bold)
+        let configure = CapsuleButton(tr("Edit List…", "Настроить…"), target: self, action: #selector(configureAction))
+        search.placeholderString = tr("Search", "Поиск")
+        search.delegate = self
+        let head = NSStackView(views: [titleLabel, NSView(), Glass.searchCapsule(search, width: 220), configure])
+        head.spacing = 10
         hint.textColor = .secondaryLabelColor
 
-        statusControl.selectedSegment = 0
-        statusControl.target = self
-        statusControl.action = #selector(filterChanged)
+        statusControl.onChange = { [weak self] _ in self?.reload() }
         fieldPopup.addItems(withTitles: ListFilter.DateField.allCases.map(\.title))
         fieldPopup.target = self
         fieldPopup.action = #selector(filterChanged)
         periodPopup.addItems(withTitles: ListFilter.Period.presets.map(\.0) + [tr("Custom range…", "Свой период…")])
         periodPopup.selectItem(at: 3)
-        periodPopup.target = self
+                periodPopup.target = self
         periodPopup.action = #selector(filterChanged)
         for p in [fromPicker, toPicker] {
             p.datePickerStyle = .textFieldAndStepper
@@ -480,15 +480,11 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             p.action = #selector(filterChanged)
         }
         fromPicker.dateValue = Calendar.current.date(byAdding: .day, value: -6, to: Date())!
-        let statusLabel = NSTextField(labelWithString: tr("Status:", "Статус:"))
         let dateLabel = NSTextField(labelWithString: tr("Date:", "Дата:"))
-        filterRow = NSStackView(views: [statusLabel, statusControl, NSView(), dateLabel, fieldPopup, periodPopup, fromPicker, dash, toPicker])
+        dateLabel.textColor = .secondaryLabelColor
+        filterRow = NSStackView(views: [statusControl, NSView(), dateLabel, glassPopup(fieldPopup), glassPopup(periodPopup), fromPicker, dash, toPicker])
         filterRow.spacing = 8
-        filterRow.setCustomSpacing(4, after: statusLabel)
         filterRow.setCustomSpacing(4, after: dateLabel)
-
-        search.placeholderString = tr("Search", "Поиск")
-        search.delegate = self
 
         table.headerView = nil
         table.dataSource = self
@@ -499,6 +495,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.backgroundColor = .clear
         table.allowsMultipleSelection = true
+        table.selectionHighlightStyle = .regular
         table.onCopy = { [weak self] in self?.copyClicked() }
         let menu = NSMenu()
         menu.delegate = self
@@ -516,26 +513,41 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             b.target = self
             b.action = sel
         }
-        let bar = NSStackView(views: [countLabel, NSView(), doneButton, backlogButton, dueButton, checkAllButton, deleteButton])
+        countLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        let buttons = NSStackView(views: [countLabel, NSView(), doneButton, backlogButton, dueButton, checkAllButton, deleteButton])
+        buttons.spacing = 6
+        buttons.setCustomSpacing(14, after: countLabel)
+        // The action bar floats under the list as one glass capsule.
+        let bar = GlassView(radius: 22, raised: true)
+        bar.capsule = true
+        buttons.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(buttons)
+        NSLayoutConstraint.activate([
+            bar.heightAnchor.constraint(equalToConstant: 44),
+            buttons.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 18),
+            buttons.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -7),
+            buttons.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+        ])
         taskOnly = [filterRow, doneButton, backlogButton, dueButton]
 
-        let stack = NSStackView(views: [head, hint, filterRow, search, scroll, bar])
+        let card = Glass.card(scroll)
+        let stack = NSStackView(views: [head, hint, filterRow, card, bar])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
-        stack.setCustomSpacing(6, after: head)
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 20, bottom: 14, right: 20)
-        for v in [head, hint, filterRow, search, scroll, bar] as [NSView] {
-            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
+        stack.setCustomSpacing(4, after: head)
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 20, bottom: 16, right: 24)
+        for v in [head, hint, filterRow, card, bar] as [NSView] {
+            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
         }
-        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
-        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
+        card.setContentHuggingPriority(.defaultLow, for: .vertical)
+        card.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
         return stack
     }
 
     /// Columns depend on the kind, which can be changed in "Edit List…".
     private func rebuildColumns() {
-        let ids = kind == .tasks ? [("check", 22.0), ("status", 96.0), ("time", 104.0), ("text", 480.0)]
+        let ids = kind == .tasks ? [("check", 22.0), ("status", 86.0), ("time", 104.0), ("text", 480.0)]
                                  : [("check", 22.0), ("time", 104.0), ("text", 540.0)]
         guard table.tableColumns.map(\.identifier.rawValue) != ids.map(\.0) else { return }
         table.tableColumns.forEach { table.removeTableColumn($0) }
@@ -555,7 +567,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         return .custom(fromPicker.dateValue, toPicker.dateValue)
     }
     private var field: ListFilter.DateField { ListFilter.DateField(rawValue: max(0, fieldPopup.indexOfSelectedItem)) ?? .created }
-    private var statusFilter: ListFilter.Status { ListFilter.Status(rawValue: max(0, statusControl.selectedSegment)) ?? .all }
+    private var statusFilter: ListFilter.Status { ListFilter.Status(rawValue: max(0, statusControl.selected)) ?? .all }
 
     @objc private func filterChanged() { reload() }
     func controlTextDidChange(_ obj: Notification) { reload() }
@@ -644,9 +656,23 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         updateButtons()
     }
 
-    @objc private func statusPicked(_ sender: NSPopUpButton) {
+    /// The status capsule in front of a task opens a menu with Backlog / Done.
+    @objc private func statusClicked(_ sender: NSButton) {
         guard sender.tag < rows.count, case .item(let i) = rows[sender.tag] else { return }
-        VoiceLists.shared.setStatus(sender.indexOfSelectedItem == 1 ? .done : .backlog, ids: [i.id], in: listID)
+        let menu = NSMenu()
+        for s in TaskStatus.allCases {
+            let m = menu.addItem(withTitle: s.title, action: #selector(statusChosen(_:)), keyEquivalent: "")
+            m.target = self
+            m.state = s == i.status ? .on : .off
+            m.representedObject = [i.id.uuidString, s.rawValue]
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
+    }
+
+    @objc private func statusChosen(_ m: NSMenuItem) {
+        guard let a = m.representedObject as? [String], a.count == 2,
+              let id = UUID(uuidString: a[0]), let s = TaskStatus(rawValue: a[1]) else { return }
+        VoiceLists.shared.setStatus(s, ids: [id], in: listID)
     }
 
     @objc private func markDone() { VoiceLists.shared.setStatus(.done, ids: Set(buttonTargets.map(\.id)), in: listID) }
@@ -711,6 +737,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { CapsuleRowView() }
+
     func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }
 
     func tableViewColumnDidResize(_ notification: Notification) {
@@ -763,14 +791,14 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
                 box.setAccessibilityLabel(tr("Select", "Отметить"))
                 control = box
             } else {
-                let pop = NSPopUpButton(frame: .zero, pullsDown: false)
-                pop.addItems(withTitles: TaskStatus.allCases.map(\.title))
-                pop.selectItem(at: i.status == .done ? 1 : 0)
-                pop.controlSize = .small
-                pop.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-                pop.target = self
-                pop.action = #selector(statusPicked(_:))
-                control = pop
+                let pill = CapsuleButton(i.status.title, style: i.status == .done ? .done : .glass,
+                                         target: self, action: #selector(statusClicked(_:)))
+                pill.height = 22
+                pill.fontSize = 12
+                pill.padding = 10
+                pill.widthAnchor.constraint(equalToConstant: 78).isActive = true
+                pill.setAccessibilityLabel(tr("Status: \(i.status.title)", "Статус: \(i.status.title)"))
+                control = pill
             }
             control.tag = row
             control.translatesAutoresizingMaskIntoConstraints = false
