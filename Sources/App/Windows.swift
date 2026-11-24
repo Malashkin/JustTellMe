@@ -195,3 +195,21 @@ final class CorrectionWindow: NSObject {
         a.runModal()
     }
 }
+
+/// A table whose text can be selected with the mouse and copied with ⌘C, like in Notes or Mail.
+/// NSTableView normally keeps clicks for row selection; here a click or drag on selectable text goes to the text.
+/// ⌘C with no text selected copies the selected rows through `onCopy`.
+final class SelectableTextTableView: NSTableView, NSMenuItemValidation {
+    var onCopy: (() -> Void)?
+
+    override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
+        if let field = responder as? NSTextField, field.isSelectable { return true }
+        return super.validateProposedFirstResponder(responder, for: event)
+    }
+
+    @objc func copy(_ sender: Any?) { onCopy?() }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item.action == #selector(copy(_:)) ? onCopy != nil && !selectedRowIndexes.isEmpty : true
+    }
+}

@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 ## [Unreleased]
 
 ### Added
+- **Select and copy part of the text.** On Главная and Заметки you can select any part of a dictation or a note with the mouse and copy it with ⌘C. ⌘C with whole rows highlighted copies those entries; a double click on the time copies the whole entry; right-click on a note → «Скопировать».
 - **Voice notes.** Start a dictation with the word «Заметка» («Заметка: позвонить в банк») and the rest is saved as a note instead of being pasted. A card «Заметка сохранена» confirms it, with a button to open the notes. Notes live on the new page Заметки in the main window: newest first, grouped by day, with search. Only the word at the very start counts («Это заметка про…» is pasted as usual); «Заметка» alone saves nothing. Notes are kept in `notes.json` and are not counted in the dictation feed or the stats.
 - **A misheard «Заметка» still makes a note.** The first word may be one letter off («Замевка», «Заметко», «Саметка», «Заметку») or split in two («За метка», «За мефка»). Real words that are one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка») are pasted as usual.
 - **Dates on notes.** Day headers always show the date («Сегодня, 23 ноября»), and every note shows its date and time.

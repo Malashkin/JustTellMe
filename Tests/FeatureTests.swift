@@ -116,6 +116,21 @@ enum FeatureTests {
             T.eq(NotesPane.deleteTitle(3), "Удалить 3 заметки")
             T.eq(NotesPane.deleteTitle(5), "Удалить 5 заметок")
         }
+        T.test("feed and notes: text can be selected with the mouse, ⌘C copies the selected rows") {
+            let table = SelectableTextTableView()
+            let text = NSTextField(wrappingLabelWithString: "Купить молоко")
+            text.isSelectable = true
+            T.ok(table.validateProposedFirstResponder(text, for: nil), "a click on selectable text goes to the text, not the row")
+            let time = NSTextField(labelWithString: "10:04")
+            time.isSelectable = false
+            T.ok(!time.acceptsFirstResponder, "the time label cannot take the click, so it still selects the row")
+            var copied = 0
+            table.onCopy = { copied += 1 }
+            table.copy(nil)
+            T.eq(copied, 1, "⌘C with no text selected copies the rows")
+            let d = Date()
+            T.eq(NotesPane.copyText([Note(id: UUID(), date: d, text: "Первая", lang: "ru"), Note(id: UUID(), date: d, text: "Вторая", lang: "ru")]), "Первая\nВторая")
+        }
         T.test("notes: the main window has a Заметки page right after Главная") {
             T.eq(MainWindow.Page.notes.rawValue, MainWindow.Page.home.rawValue + 1)
             T.eq(MainWindow.Page.notes.title, "Заметки")

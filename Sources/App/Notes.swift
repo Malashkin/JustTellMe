@@ -133,7 +133,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
     private enum Row { case day(String), note(Note) }
 
     private(set) lazy var view: NSView = build()
-    private let table = NSTableView()
+    private let table = SelectableTextTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
     private let deleteButton = NSButton(title: "Удалить", target: nil, action: nil)
@@ -204,7 +204,10 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.backgroundColor = .clear
         table.allowsMultipleSelection = true
+        table.onCopy = { [weak self] in self?.copyClicked() }
         let menu = NSMenu()
+        menu.addItem(withTitle: "Скопировать", action: #selector(copyClicked), keyEquivalent: "").target = self
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Удалить", action: #selector(deleteClicked), keyEquivalent: "").target = self
         table.menu = menu
 
@@ -215,7 +218,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         scroll.drawsBackground = false
 
         countLabel.textColor = .secondaryLabelColor
-        let tip = NSTextField(labelWithString: "Отметьте заметки галочками и нажмите «Удалить» · правый клик — удалить одну")
+        let tip = NSTextField(labelWithString: "Выделите текст мышью и нажмите ⌘C · отметьте заметки галочками и нажмите «Удалить» · правый клик — удалить одну")
         tip.textColor = .tertiaryLabelColor
         tip.font = .systemFont(ofSize: 11)
         deleteButton.target = self
@@ -306,6 +309,18 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         }
     }
 
+    /// Context menu «Скопировать» or ⌘C on highlighted rows: the whole text of those notes.
+    @objc private func copyClicked() {
+        let notes = selected
+        guard !notes.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.copyText(notes), forType: .string)
+        countLabel.stringValue = notes.count == 1 ? "Скопировано" : "Скопировано: \(notes.count)"
+    }
+
+    /// Several notes are copied one per line, in the order shown.
+    static func copyText(_ notes: [Note]) -> String { notes.map(\.text).joined(separator: "\n") }
+
     /// Context menu: the right-clicked note (or the highlight it is part of).
     @objc private func deleteClicked() { confirmDelete(selected) }
 
@@ -356,7 +371,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
         let cell = NSTableCellView()
         let t = NSTextField(wrappingLabelWithString: "")
         t.translatesAutoresizingMaskIntoConstraints = false
-        t.isSelectable = true
+        t.isSelectable = false
         cell.addSubview(t)
         cell.textField = t
         var top: CGFloat = 6
@@ -375,6 +390,7 @@ final class NotesPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSS
             } else {
                 t.stringValue = n.text
                 t.font = Self.textFont
+                t.isSelectable = true   // select part of the text with the mouse, ⌘C
             }
         }
         NSLayoutConstraint.activate([

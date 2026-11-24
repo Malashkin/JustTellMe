@@ -32,7 +32,7 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
 | `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
-| `Windows.swift` | `VocabularyPane` (Словарь page), `CorrectionWindow` (fix and remember) |
+| `Windows.swift` | `VocabularyPane` (Словарь page), `CorrectionWindow` (fix and remember), `SelectableTextTableView` (text in the feed and notes can be selected with the mouse; ⌘C copies highlighted rows) |
 | `Overlay.swift` | The recording pill; `WaveView` draws 18 CALayer bars at 30 fps |
 | `Settings.swift` | `Prefs`, CoreAudio helpers, `SystemMute`, `SecureInput` |
 | `Models.swift` | Bundled, imported and downloaded models; the active model |

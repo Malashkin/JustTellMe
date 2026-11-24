@@ -33,8 +33,8 @@ Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → «Откр�
 
 | Page | What's there |
 |---|---|
-| **Главная** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Search; double-click to copy; right-click to fix or delete; «Очистить всё…». |
-| **Заметки** | Voice notes, newest first, grouped by day (headers «Сегодня, 23 ноября», «Вчера, 22 ноября», then full dates); each note shows its date and time. Search. Tick notes (or «Отметить все» / «Снять отметки») and press «Удалить N заметок»; right-click → «Удалить» for one note. Asks first; only visible notes are deleted. |
+| **Главная** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Select any part of the text with the mouse and press ⌘C; ⌘C on highlighted rows or a double click on the time copies the whole entry. Search; right-click to fix or delete; «Очистить всё…». |
+| **Заметки** | Voice notes, newest first, grouped by day (headers «Сегодня, 23 ноября», «Вчера, 22 ноября», then full dates); each note shows its date and time. Search. Select part of a note with the mouse and press ⌘C; right-click → «Скопировать» copies the whole note. Tick notes (or «Отметить все» / «Снять отметки») and press «Удалить N заметок»; right-click → «Удалить» for one note. Asks first; only visible notes are deleted. |
 | **Статистика** | Today / 7 / 30 days / all time: words, characters, dictations, speaking time, words per minute, time saved (typing at 40 wpm minus speaking time); words-per-day chart; apps; languages; streak |
 | **Словарь** | Prompt, personal dictionary, personal replacements (`wrong => right`), on/off toggle for the read-only built-in dictionary |
 | **Настройки** | All settings, see [settings.md](settings.md) |

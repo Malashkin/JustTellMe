@@ -197,7 +197,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private let problems = NSStackView()
     private var lastStatus: AppStatus?
     private var cards: [StatCard] = []
-    private let table = NSTableView()
+    private let table = SelectableTextTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
     private var rows: [Row] = []
@@ -245,6 +245,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.doubleAction = #selector(copySelected)
         table.target = self
+        table.onCopy = { [weak self] in self?.copySelected() }
         let menu = NSMenu()
         menu.addItem(withTitle: "Скопировать", action: #selector(copySelected), keyEquivalent: "c").target = self
         menu.addItem(withTitle: "Исправить и запомнить…", action: #selector(fixSelected), keyEquivalent: "").target = self
@@ -260,7 +261,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         table.backgroundColor = .clear
 
         countLabel.textColor = .secondaryLabelColor
-        let tip = NSTextField(labelWithString: "Двойной клик — скопировать · правый клик — исправить или удалить")
+        let tip = NSTextField(labelWithString: "Выделите текст мышью и нажмите ⌘C · двойной клик по времени — скопировать запись · правый клик — исправить или удалить")
         tip.textColor = .tertiaryLabelColor
         tip.font = .systemFont(ofSize: 11)
         let clear = NSButton(title: "Очистить всё…", target: self, action: #selector(clearAll))
@@ -411,6 +412,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
                 top = 7
             } else {
                 t.attributedStringValue = Self.entryText(e)
+                t.isSelectable = true   // select part of the text with the mouse, ⌘C
             }
         }
         NSLayoutConstraint.activate([
