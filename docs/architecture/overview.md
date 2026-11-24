@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Overview
@@ -28,7 +28,8 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with «Скопировать» |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
-| `Notes.swift` | `NoteCommand` (is this dictation «Заметка …»?), `Notes` (`notes.json`, newest first, 5000 max), `NotesPane` (Заметки page: by day, search, checkboxes and bulk delete), `NoteSavedCard` |
+| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page), `ListEditor` («Новый список» / «Настроить…») |
+| `VoiceCommands.swift` | `SpokenKeyword` (a command word at the start, one letter off, split in two, lookalikes), `SavedCard` («Сохранено в «…»») |
 | `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
 | `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
@@ -61,8 +62,8 @@ sequenceDiagram
     S->>W: transcribe remainder
     W-->>S: text (cleanup, replacements, casing)
     S-->>A: joined text + language
-    alt text starts with «Заметка»
-        A->>A: Notes.add (rest of the phrase) → NoteSavedCard, nothing pasted
+    alt text starts with a voice list's command word («Заметка», «Задача», …)
+        A->>A: VoiceLists.addItem (rest of the phrase) → SavedCard, nothing pasted
     else
         A->>A: History.add
         A->>P: insert (clipboard promise + ⌘V, restore after read)
@@ -71,7 +72,7 @@ sequenceDiagram
 ```
 
 Notes:
-- A result whose first word is «Заметка» goes to `Notes`, not to the frontmost app or `History` ([ADR 009](decisions/009-voice-notes-by-keyword.md)).
+- A result whose first word is a voice list's command word goes to that list, not to the frontmost app or `History` ([ADR 009](decisions/009-voice-notes-by-keyword.md), [ADR 010](decisions/010-configurable-voice-lists.md)).
 - Pieces run one at a time on the transcriber's serial queue. The language and prompt for a piece are decided on
   that queue, so they always see the previous piece's result. A piece that follows an English piece is decoded as English.
 - `auto` decodes as Russian, with no separate detection pass. The language label comes from the script, counting words.
@@ -86,13 +87,14 @@ Notes:
 ```mermaid
 flowchart LR
     MW[MainWindow<br/>sidebar] --> H[HomePane<br/>status · quick stats · feed]
-    MW --> N[NotesPane<br/>by day · search · delete]
+    MW --> N[ListPane per list<br/>by day · search · ticks · tasks: status, deadline, filters]
+    MW --> LE[ListEditor<br/>new list · words · kind · delete]
     MW --> ST[StatsPane]
     MW --> V[VocabularyPane]
     MW --> SE[SettingsPane]
     SE -- SettingsHost --> AD[AppDelegate]
     HI[(History)] -- onChange --> MW
-    NO[(Notes)] -- onChange --> N
+    NO[(VoiceLists)] -- onChange --> MW
     AD -- appStatus --> H
 ```
 
@@ -115,6 +117,6 @@ See [ADR 007](decisions/007-updates-from-github-releases.md).
 
 ## Data on disk
 
-`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `notes.json`, `dictionary.txt`,
+`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `lists.json`, `list-<id>.json`, `dictionary.txt`,
 `replacements.txt`, `prompt.txt` (only when customised), `Models/` (downloaded models and Core ML encoders).
 See [security/](../security/index.md).

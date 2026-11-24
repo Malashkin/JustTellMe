@@ -12,42 +12,60 @@ struct AppStatus: Equatable {
     var update: String?
 }
 
-/// The app's only window: a sidebar with Главная (feed + quick stats), Заметки, Статистика, Словарь, Настройки.
+/// The app's only window: a sidebar with Главная (feed + quick stats), the voice lists (Заметки, Задачи and any
+/// the user creates), «Новый список», Статистика, Словарь, Настройки.
 /// Opened from the menu-bar icon or by launching the app again from Finder/Launchpad/Dock.
 final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     enum Page: Int, CaseIterable {
-        case home, notes, stats, vocabulary, settings
-        var title: String { ["Главная", "Заметки", "Статистика", "Словарь", "Настройки"][rawValue] }
-        var symbol: String { ["house", "note.text", "chart.bar.xaxis", "character.book.closed", "gearshape"][rawValue] }
+        case home, stats, vocabulary, settings
+        var title: String { ["Главная", "Статистика", "Словарь", "Настройки"][rawValue] }
+        var symbol: String { ["house", "chart.bar.xaxis", "character.book.closed", "gearshape"][rawValue] }
+    }
+
+    /// One row of the sidebar.
+    enum Item: Equatable {
+        case page(Page), list(UUID), addList
+    }
+
+    /// Главная, then the lists in their order, «Новый список», then the fixed pages.
+    static func sidebarItems(_ lists: [VoiceList]) -> [Item] {
+        [.page(.home)] + lists.map { .list($0.id) } + [.addList, .page(.stats), .page(.vocabulary), .page(.settings)]
     }
 
     let home = HomePane()
-    let notes = NotesPane()
     let stats = StatsPane()
     let vocabulary = VocabularyPane()
     let settings = SettingsPane()
+    private var listPanes: [UUID: ListPane] = [:]
 
     private var window: NSWindow?
     private let sidebar = NSTableView()
     private let content = NSView()
     private var timer: Timer?
-    private(set) var page: Page = .home
+    private var items: [Item] = []
+    private(set) var current: Item = .page(.home)
+    var page: Page? { if case .page(let p) = current { return p } else { return nil } }
 
     var isVisible: Bool { window?.isVisible ?? false }
 
     override init() {
         super.init()
+        items = Self.sidebarItems(VoiceLists.shared.lists)
         home.onOpenStats = { [weak self] in self?.open(.stats) }
         History.shared.onChange = { [weak self] in self?.historyChanged() }
-        Notes.shared.onChange = { [weak self] in
-            guard let self, self.isVisible, self.page == .notes else { return }
-            self.notes.reload()
-        }
+        VoiceLists.shared.onChange = { [weak self] id in self?.listsChanged(id) }
     }
 
-    func open(_ p: Page? = nil) {
+    func open(_ p: Page? = nil) { present(p.map { .page($0) } ?? current) }
+
+    func openList(_ id: UUID) { present(.list(id)) }
+
+    /// Every row except «Новый список», for --demo-window.
+    var demoItems: [Item] { items.filter { $0 != .addList } }
+
+    func present(_ item: Item) {
         if window == nil { build() }
-        show(p ?? page)
+        show(item)
         // A Dock icon while the window is open, so it can be found with ⌘Tab like any other app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -78,18 +96,64 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         if page == .stats { stats.reload() }
     }
 
-    private func show(_ p: Page) {
-        page = p
-        if sidebar.selectedRow != p.rawValue { sidebar.selectRowIndexes([p.rawValue], byExtendingSelection: false) }
-        let pane: NSView
-        switch p {
-        case .home: home.reload(); home.refreshStatus(); pane = home.view
-        case .notes: notes.reload(); pane = notes.view
-        case .stats: stats.reload(); pane = stats.view
-        case .vocabulary: vocabulary.reload(); pane = vocabulary.view
-        case .settings: settings.reload(); pane = settings.view
+    /// A list's entries changed (id), or the lists themselves (nil: renamed, added, deleted).
+    private func listsChanged(_ id: UUID?) {
+        if id == nil {
+            items = Self.sidebarItems(VoiceLists.shared.lists)
+            listPanes = listPanes.filter { VoiceLists.shared.list($0.key) != nil }
+            sidebar.reloadData()
+            if case .list(let cur) = current, VoiceLists.shared.list(cur) == nil { current = .page(.home) }
+            if isVisible { show(current, force: true) }
+            return
         }
-        guard pane.superview !== content else { return }
+        guard isVisible, current == .list(id!) else { return }
+        listPanes[id!]?.reload()
+    }
+
+    private func pane(for id: UUID) -> ListPane {
+        if let p = listPanes[id] { return p }
+        let p = ListPane(listID: id)
+        p.onConfigure = { [weak self] id in self?.editList(id) }
+        listPanes[id] = p
+        return p
+    }
+
+    /// «Новый список» (nil) or «Настроить…» of a list.
+    func editList(_ id: UUID?) {
+        switch ListEditor.run(id.flatMap { VoiceLists.shared.list($0) }) {
+        case .saved(let l): openList(l.id)
+        case .deleted: open(.home)
+        case .cancelled: show(current, force: true)
+        }
+    }
+
+    private func show(_ item: Item, force: Bool = false) {
+        guard item != .addList else { return }
+        current = item
+        if let row = items.firstIndex(of: item), sidebar.selectedRow != row {
+            sidebar.selectRowIndexes([row], byExtendingSelection: false)
+        }
+        let pane: NSView
+        var title = "JustTellMe"
+        switch item {
+        case .page(let p):
+            switch p {
+            case .home: home.reload(); home.refreshStatus(); pane = home.view
+            case .stats: stats.reload(); pane = stats.view
+            case .vocabulary: vocabulary.reload(); pane = vocabulary.view
+            case .settings: settings.reload(); pane = settings.view
+            }
+            if p != .home { title = p.title }
+        case .list(let id):
+            let lp = self.pane(for: id)
+            lp.reload()
+            pane = lp.view
+            title = VoiceLists.shared.list(id)?.name ?? title
+        case .addList:
+            return
+        }
+        window?.title = title
+        if pane.superview === content { return }
         content.subviews.forEach { $0.removeFromSuperview() }
         pane.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(pane)
@@ -99,7 +163,6 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             pane.topAnchor.constraint(equalTo: content.safeAreaLayoutGuide.topAnchor),
             pane.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
-        window?.title = p == .home ? "JustTellMe" : p.title
     }
 
     private func build() {
@@ -142,14 +205,25 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
 
     // MARK: sidebar
 
-    func numberOfRows(in tableView: NSTableView) -> Int { Page.allCases.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
 
     func tableView(_ tableView: NSTableView, viewFor col: NSTableColumn?, row: Int) -> NSView? {
-        let p = Page(rawValue: row)!
+        let title: String, symbol: String
+        var dim = false
+        switch items[row] {
+        case .page(let p): title = p.title; symbol = p.symbol
+        case .list(let id):
+            let l = VoiceLists.shared.list(id)
+            title = l?.name ?? "?"
+            symbol = l?.kind == .tasks ? "checklist" : "note.text"
+        case .addList: title = "Новый список"; symbol = "plus"; dim = true
+        }
         let cell = NSTableCellView()
-        let img = NSImageView(image: NSImage(systemSymbolName: p.symbol, accessibilityDescription: p.title) ?? NSImage())
-        let t = NSTextField(labelWithString: p.title)
+        let img = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: title) ?? NSImage())
+        let t = NSTextField(labelWithString: title)
         t.font = .systemFont(ofSize: 13)
+        t.lineBreakMode = .byTruncatingTail
+        if dim { t.textColor = .secondaryLabelColor; img.contentTintColor = .secondaryLabelColor }
         for v in [img, t] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(v) }
         cell.imageView = img
         cell.textField = t
@@ -158,14 +232,24 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             img.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             img.widthAnchor.constraint(equalToConstant: 18),
             t.leadingAnchor.constraint(equalTo: img.trailingAnchor, constant: 8),
+            t.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -4),
             t.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
         ])
         return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard let p = Page(rawValue: sidebar.selectedRow), p != page || content.subviews.isEmpty else { return }
-        show(p)
+        let row = sidebar.selectedRow
+        guard row >= 0, row < items.count else { return }
+        let item = items[row]
+        if item == .addList {
+            // Not a page: keep the current page selected and ask for the new list.
+            DispatchQueue.main.async { self.editList(nil) }
+            if let cur = items.firstIndex(of: current) { sidebar.selectRowIndexes([cur], byExtendingSelection: false) }
+            return
+        }
+        guard item != current || content.subviews.isEmpty else { return }
+        show(item)
     }
 
     /// Render the window content to PNG (used by --demo-window).

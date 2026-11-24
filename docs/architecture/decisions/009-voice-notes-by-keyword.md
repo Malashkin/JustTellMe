@@ -1,12 +1,12 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # 009. Voice notes: the word «Заметка» at the start, saved instead of pasted
 
-**Status:** Accepted (2026-11-23)
+**Status:** Accepted (2026-11-23), extended by [ADR 010](010-configurable-voice-lists.md): the word and the list are now configurable
 
 ## Context
 Some things you say are not meant for the app in front of you: a reminder, an idea, a task. They should be kept

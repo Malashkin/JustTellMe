@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Architecture decisions (ADRs)
@@ -18,4 +18,5 @@ Each record explains one choice that isn't obvious from the code. Up: [architect
 | [006](006-unload-when-idle.md) | Free the model after 15 idle minutes, reload on the GPU first | Accepted |
 | [007](007-updates-from-github-releases.md) | Updates from GitHub Releases, installed and verified by the app | Accepted |
 | [008](008-keep-pauses-inside-a-clip.md) | Cut pauses inside a clip before recognition | Rejected |
-| [009](009-voice-notes-by-keyword.md) | Voice notes: the word «Заметка» at the start, saved instead of pasted | Accepted |
+| [009](009-voice-notes-by-keyword.md) | Voice notes: the word «Заметка» at the start, saved instead of pasted | Accepted, extended by 010 |
+| [010](010-configurable-voice-lists.md) | Voice lists: own names and command words, notes or tasks | Accepted |

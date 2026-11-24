@@ -1,7 +1,7 @@
 ---
 audience: product
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Features
@@ -23,9 +23,17 @@ The text is pasted with ⌘V. Your clipboard is restored right after the target 
 - **⌃⌥V pastes the last dictation again** where the cursor is now, e.g. when it went to the wrong field. Also in the menu: 🎙 → «Вставить последнее ещё раз». It works without extra permissions, and the key press never reaches the app you are in.
 - **No text field?** If the cursor was not in a text field (Finder, the desktop, a list, a web page with nothing focused), a card «Курсор не в поле ввода?» shows the text with a «Скопировать» button for 12 s. When JustTellMe cannot tell (Chrome, Electron apps such as VS Code or Slack), it stays quiet rather than show the card for nothing. The text is always in the feed on Главная anyway.
 
-## Voice notes
+## Voice lists
 
-Start a dictation with the word «Заметка» and the rest of the phrase becomes a note: nothing is pasted into the frontmost app. «Заметка, купить молоко.» saves «Купить молоко.». The recogniser may get the word slightly wrong, so one wrong, missing or extra letter is accepted («Замевка», «Заметко», «Заметку»), and so is the word split in two («За метка»). Real words one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка») never count. Only the word at the very start counts, as a whole word: «Это заметка про отпуск» and «Заметками займусь завтра» are pasted as usual. «Заметка» alone saves nothing and beeps. A card «Заметка сохранена» shows the text for 4 s with «Открыть заметки». Notes are not part of the Главная feed or the stats.
+Start a dictation with a list's command word and the rest of the phrase goes to that list; nothing is pasted into the frontmost app. Out of the box there are two lists: **Заметки** («Заметка, купить молоко.» saves «Купить молоко.») and **Задачи** («Задача: отправить отчёт»). A card «Сохранено в «…»» shows the text for 4 s with a button to open the list. Lists are not part of the Главная feed or the stats.
+
+- **Own lists.** «Новый список» in the sidebar asks for a name, command words separated by commas («Идея, Мысль») and a kind: notes (plain entries) or tasks. «Настроить…» at the top of a list changes all three or deletes the list together with its entries (asks first). Заметки and Задачи can be renamed, changed or deleted like any other list. A command word is one word and may belong to one list only.
+- **Which phrases count.** Only the first word, as a whole word: «Это заметка про отпуск» and «Заметками займусь завтра» are pasted as usual. A word of 6 letters or more may be one letter wrong, missing or extra («Замевка», «Заметко», «Зодача») or split in two («За метка»); real words one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка», «Задачам», «Задачах») never count. Shorter words («Идея») must be heard exactly. The command word alone saves nothing and beeps.
+- **Every list** shows entries grouped by day with dated headers («Сегодня, 23 ноября», «Вчера, 22 ноября», «Завтра, 24 ноября», then full dates), the date and time on each entry, search, ticks with «Отметить все» and «Удалить N …», right-click → «Скопировать» / «Удалить», and text you can select with the mouse and copy with ⌘C.
+- **Tasks lists** add:
+  - a status per task, Backlog or Done, from the menu in front of it, from «Done» / «В Backlog» for the ticked tasks, or from the right-click menu. Done tasks are struck through and remember when they were done.
+  - a deadline: «Срок…» (calendar), «Убрать срок». The line under a task shows «Срок: 25 нояб.», in red with «— просрочено» when it has passed in Backlog, and «Сделано: 24 нояб., 10:04».
+  - filters: Статус (Все / Backlog / Done); Дата — Создана, Срок or Сделана — over Сегодня, 7 дней, 30 дней, Все даты or «Свой период…» (from–to, both days included). Создана and Сделана look back; Срок looks ahead (due in the next 1/7/30 days) and always includes overdue tasks in Backlog. Entries are grouped by the chosen date; deadlines soonest first, tasks without one last under «Без срока».
 
 ## Main window
 
@@ -34,7 +42,7 @@ Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → «Откр�
 | Page | What's there |
 |---|---|
 | **Главная** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Select any part of the text with the mouse and press ⌘C; ⌘C on highlighted rows or a double click on the time copies the whole entry. Search; right-click to fix or delete; «Очистить всё…». |
-| **Заметки** | Voice notes, newest first, grouped by day (headers «Сегодня, 23 ноября», «Вчера, 22 ноября», then full dates); each note shows its date and time. Search. Select part of a note with the mouse and press ⌘C; right-click → «Скопировать» copies the whole note. Tick notes (or «Отметить все» / «Снять отметки») and press «Удалить N заметок»; right-click → «Удалить» for one note. Asks first; only visible notes are deleted. |
+| **Заметки**, **Задачи**, own lists | One page per voice list (see above), in the sidebar after Главная, followed by «Новый список». |
 | **Статистика** | Today / 7 / 30 days / all time: words, characters, dictations, speaking time, words per minute, time saved (typing at 40 wpm minus speaking time); words-per-day chart; apps; languages; streak |
 | **Словарь** | Prompt, personal dictionary, personal replacements (`wrong => right`), on/off toggle for the read-only built-in dictionary |
 | **Настройки** | All settings, see [settings.md](settings.md) |

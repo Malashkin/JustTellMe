@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let neural = NeuralEngine()
     private let fixWindow = CorrectionWindow()
     private let noFieldCard = NoFieldCard()
-    private let noteCard = NoteSavedCard()
+    private let savedCard = SavedCard()
     let updater = Updater()
     private var repasteShortcut: GlobalShortcut?
     private var state: State = .loading
@@ -69,7 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hotkey.onUp = { [weak self] in self?.pttUp() }
         hotkey.onCombo = { [weak self] in self?.cancelRecording() }
         hotkey.onEscape = { [weak self] in self?.escapePressed() }
-        noteCard.onOpen = { [weak self] in self?.main.open(.notes) }
         applyUnloadPref()
         transcriber.onEncoderAttached = { [weak self] in self?.rebuildModelMenu(); self?.main.refresh() }
         repasteShortcut = GlobalShortcut(keyCode: kVK_ANSI_V, modifiers: controlKey | optionKey) { [weak self] in self?.pasteLastAgain() }
@@ -350,8 +349,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.lastResult = r.text
             self.updateStatusLine()
             let front = NSWorkspace.shared.frontmostApplication
-            if let note = NoteCommand.body(of: r.text) {
-                self.saveNote(note, lang: r.lang)
+            if let hit = VoiceLists.shared.match(r.text) {
+                self.saveToList(hit.list, hit.body, lang: r.lang)
                 return
             }
             History.shared.add(text: r.text, lang: r.lang, app: front?.localizedName, seconds: Double(audio.count) / 16_000)
@@ -360,13 +359,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// «Заметка …»: the text goes to the Заметки page instead of the frontmost app.
-    private func saveNote(_ text: String, lang: String) {
+    /// «Заметка …», «Задача …» or another list's command word: the text goes to that list instead of the frontmost app.
+    private func saveToList(_ list: VoiceList, _ text: String, lang: String) {
         guard !text.isEmpty else { NSSound.beep(); return }
-        Notes.shared.add(text: text, lang: lang)
-        NSLog("JustTellMe: note saved, %d chars", text.count)
+        VoiceLists.shared.addItem(to: list.id, text: text, lang: lang)
+        NSLog("JustTellMe: saved to a voice list, %d chars", text.count)
         if Prefs.sounds { NSSound(named: "Glass")?.play() }
-        noteCard.show(text)
+        savedCard.onOpen = { [weak self] in self?.main.openList(list.id) }
+        savedCard.show(text, title: "Сохранено в «\(list.name)»", button: "Открыть «\(list.name)»")
     }
 
     /// Pasting went nowhere (no text field focused): show the text with a «Скопировать» button.

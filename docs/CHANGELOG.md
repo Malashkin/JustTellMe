@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Changelog
@@ -11,12 +11,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 ## [Unreleased]
 
 ### Added
-- **Select and copy part of the text.** On Главная and Заметки you can select any part of a dictation or a note with the mouse and copy it with ⌘C. ⌘C with whole rows highlighted copies those entries; a double click on the time copies the whole entry; right-click on a note → «Скопировать».
-- **Voice notes.** Start a dictation with the word «Заметка» («Заметка: позвонить в банк») and the rest is saved as a note instead of being pasted. A card «Заметка сохранена» confirms it, with a button to open the notes. Notes live on the new page Заметки in the main window: newest first, grouped by day, with search. Only the word at the very start counts («Это заметка про…» is pasted as usual); «Заметка» alone saves nothing. Notes are kept in `notes.json` and are not counted in the dictation feed or the stats.
-- **A misheard «Заметка» still makes a note.** The first word may be one letter off («Замевка», «Заметко», «Саметка», «Заметку») or split in two («За метка», «За мефка»). Real words that are one letter off («Заметна», «Заметкам», «Заметках», «Зачётка», «Намётка») are pasted as usual.
-- **Dates on notes.** Day headers always show the date («Сегодня, 23 ноября»), and every note shows its date and time.
-- **Deleting notes.** Tick notes with the checkbox in front of each one (or «Отметить все») and press «Удалить N заметок» to delete them at once; right-click a note → «Удалить» removes just that one. A confirmation is asked first. Ticks on notes hidden by the search are dropped, so nothing invisible is deleted.
-- `--demo-note-card out.png` renders the «Заметка сохранена» card.
+- **Voice lists.** Start a dictation with a list's command word and the rest of the phrase is saved to that list instead of being pasted: «Заметка: позвонить в банк» → Заметки, «Задача: отправить отчёт» → Задачи. A card «Сохранено в «…»» confirms it, with a button to open the list. Each list is a page in the sidebar; nothing goes to the Главная feed or the stats.
+- **Own lists and command words.** «Новый список» in the sidebar creates a list: a name, one or more command words separated by commas («Идея, Мысль»), and a kind — notes (plain entries) or tasks. «Настроить…» on a list renames it, changes its words or kind, or deletes it with its entries (after a confirmation). Заметки and Задачи are ordinary lists and can be changed or deleted too.
+- **Tasks.** A tasks list adds a status (new tasks are Backlog, then Done, changed per task or for the ticked ones; Done remembers when), a deadline («Срок…», overdue ones in red), and filters: status (Все / Backlog / Done), which date (Создана / Срок / Сделана) and a period (Сегодня, 7 дней, 30 дней, Все даты, or «Свой период…» from–to). Entries are grouped by that date.
+- **A misheard command word still counts.** Words of 6 letters or more may be one letter off or split in two («Замевка», «За мефка», «Зодача»). Real words one letter off («Заметна», «Заметкам», «Зачётка», «Задачам», …) are excluded; shorter words («Идея») must be heard exactly. A word heard exactly wins over a near miss of another list's word.
+- **Dates, search, ticks and bulk delete in every list.** Day headers always show the date («Сегодня, 23 ноября», «Завтра, 24 ноября»), every entry shows its date and time. Tick entries (or «Отметить все») and press «Удалить N …»; a tick on an entry hidden by a search or filter is dropped.
+- **Select and copy part of the text.** On Главная and in the lists you can select any part of an entry with the mouse and copy it with ⌘C. ⌘C with whole rows highlighted copies those entries; right-click → «Скопировать».
+- `--demo-note-card out.png` renders the «Сохранено в «Заметки»» card.
+
+### Changed
+- Notes saved by earlier builds of this branch (`notes.json`) are moved into the Заметки list on the first start.
 
 ## [1.2.0] — 2026-11-12
 

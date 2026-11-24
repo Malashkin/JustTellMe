@@ -138,13 +138,15 @@ if let out = opt("--demo-window") {
     app.appearance = NSAppearance(named: .aqua)
     let w = MainWindow()
     w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: false, modelReady: true) }
-    var pages = MainWindow.Page.allCases
+    var pages = w.demoItems
+    var n = 0
     func next() {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
-        w.open(p)
+        w.present(p)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            w.snapshot(to: URL(fileURLWithPath: "\(out)-\(p.rawValue).png"))
+            w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
+            n += 1
             next()
         }
     }
@@ -225,13 +227,14 @@ if let out = opt("--demo-card") {
     app.run()
 }
 
-//   JustTellMe --demo-note-card out.png   (renders the «Заметка сохранена» card)
+//   JustTellMe --demo-note-card out.png   (renders the «Сохранено в «Заметки»» card)
 if let out = opt("--demo-note-card") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.appearance = NSAppearance(named: .aqua)
-    let c = NoteSavedCard()
-    c.show("Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте.")
+    let c = SavedCard()
+    c.show("Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте.",
+           title: "Сохранено в «Заметки»", button: "Открыть «Заметки»")
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
     app.run()
 }

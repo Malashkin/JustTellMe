@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Privacy & security
@@ -31,7 +31,8 @@ it is refused with the reason. See [ADR 007](../architecture/decisions/007-updat
 
 | File | Contents | Removed by |
 |---|---|---|
-| `notes.json` | Voice notes («Заметка …»): text, time, language (max 5000) | «Удалить» on Заметки |
+| `lists.json`, `list-<id>.json` | Voice lists (name, command words, kind) and their entries: text, time, language; for tasks status, done time, deadline (max 5000 per list) | «Удалить» in a list; «Настроить…» → «Удалить список…» |
+| `notes.json` | Notes from earlier builds of this branch; copied into Заметки on the first start and no longer used | Delete the file |
 | `history.json` | Every dictation: text, time, language, app, length (max 2000) | «Очистить всё…» / «Удалить» on Главная |
 | `dictionary.txt`, `replacements.txt` | Personal terms and fixes | Словарь page |
 | `prompt.txt` | Custom prompt (only if changed) | «Подсказка по умолчанию» |
