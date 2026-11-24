@@ -705,6 +705,14 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     }
 
     private static let textFont = NSFont.systemFont(ofSize: 13)
+    /// Top inset of the entry text in its cell.
+    private static let textTop: CGFloat = 6
+    /// Where the first line of the entry text sits, measured from the top of the row.
+    private static let textBaseline: CGFloat = {
+        let probe = NSTextField(wrappingLabelWithString: "Ag")
+        probe.font = textFont
+        return textTop + probe.firstBaselineOffsetFromTop
+    }()
 
     private func itemText(_ i: ListItem) -> NSAttributedString {
         let para = NSMutableParagraphStyle()
@@ -747,7 +755,9 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             cell.addSubview(control)
             NSLayoutConstraint.activate([
                 control.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                control.topAnchor.constraint(equalTo: cell.topAnchor, constant: id == "check" ? 8 : 4),
+                // The status menu sits on the same baseline as the task text; the checkbox has no text to align.
+                id == "check" ? control.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8)
+                              : control.firstBaselineAnchor.constraint(equalTo: cell.topAnchor, constant: Self.textBaseline),
             ])
             return cell
         }
@@ -757,7 +767,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         t.isSelectable = false
         cell.addSubview(t)
         cell.textField = t
-        var top: CGFloat = 6
+        var top: CGFloat = Self.textTop
         switch rows[row] {
         case .day(let name):
             t.stringValue = name
