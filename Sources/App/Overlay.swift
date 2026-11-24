@@ -92,7 +92,7 @@ final class RecordingOverlay {
         lockDot.frame = NSRect(x: 9, y: (size.height - 9) / 2, width: 9, height: 9)
         lockDot.wantsLayer = true
         lockDot.layer?.cornerRadius = 4.5
-        lockDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+        lockDot.layer?.backgroundColor = Brick.orange.cgColor
         lockDot.isHidden = !locked
         bg.addSubview(lockDot)
         p.contentView = bg
@@ -185,7 +185,7 @@ final class WaveView: NSView {
     }
 
     private func recolor() {
-        let c = cg(mode == .transcribing ? NSColor.systemOrange.withAlphaComponent(0.95) : NSColor.labelColor.withAlphaComponent(0.85))
+        let c = cg(mode == .transcribing ? Brick.blueText : NSColor.labelColor.withAlphaComponent(0.85))
         CATransaction.begin(); CATransaction.setDisableActions(true)
         for b in bars { b.backgroundColor = c }
         CATransaction.commit()

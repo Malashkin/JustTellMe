@@ -96,6 +96,21 @@ enum GlassTests {
             T.ok(close.minX - panel.minX >= 8 && close.minY - panel.minY >= 6, "room between the buttons and the panel edge")
             T.ok(inset.y * 2 < 52, "the button strip ends above the page title")
         }
+        T.test("palette: brick blue, yellow, green and orange; no red anywhere") {
+            func hue(_ c: NSColor) -> CGFloat { c.usingColorSpace(.sRGB)!.hueComponent * 360 }
+            let all = [Brick.blue, Brick.yellow, Brick.green, Brick.orange]
+            for c in all { T.ok(hue(c) > 20 && hue(c) < 340, "hue \(Int(hue(c))) is not red") }
+            for appearance in [NSAppearance(named: .aqua)!, NSAppearance(named: .darkAqua)!] {
+                appearance.performAsCurrentDrawingAppearance {
+                    for c in [Brick.orangeText, Brick.greenText, Brick.blueText, Glass.doneText] {
+                        T.ok(hue(c) > 20 && hue(c) < 340, "text hue \(Int(hue(c))) is not red")
+                    }
+                }
+            }
+            let delete = CapsuleButton("Delete", style: .destructive)
+            let color = delete.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+            T.ok(color == Brick.orangeText, "Delete is orange, not red")
+        }
         T.test("glass: the backdrop mask stretches with the view") {
             let m = Glass.mask(radius: 22)
             T.eq(m.resizingMode, .stretch)

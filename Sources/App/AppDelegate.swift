@@ -407,9 +407,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch s {
         case .loading: symbol = "hourglass"; tint = nil
         case .idle: symbol = "mic"; tint = nil
-        case .recording: symbol = "mic.fill"; tint = .systemRed
-        case .transcribing: symbol = "waveform"; tint = .systemOrange
-        case .error: symbol = "mic.slash"; tint = .systemYellow
+        case .recording: symbol = "mic.fill"; tint = Brick.orange
+        case .transcribing: symbol = "waveform"; tint = Brick.blue
+        case .error: symbol = "mic.slash"; tint = Brick.yellow
         }
         if let b = statusItem.button {
             let img = NSImage(systemSymbolName: symbol, accessibilityDescription: "JustTellMe")

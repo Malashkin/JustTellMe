@@ -13,9 +13,12 @@ enum Glass {
     /// Separators between rows inside a card.
     static let hairline = dynamic(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.07))
     /// "Done" status capsule.
-    static let doneFill = NSColor.systemGreen.withAlphaComponent(0.2)
-    static let doneText = dynamic(light: NSColor(calibratedRed: 0.04, green: 0.42, blue: 0.23, alpha: 1),
-                                  dark: NSColor(calibratedRed: 0.45, green: 0.86, blue: 0.6, alpha: 1))
+    static let doneFill = Brick.green.withAlphaComponent(0.2)
+    static let doneText = Brick.greenText
+
+    /// The main action: tinted glass, not a solid accent slab.
+    static let accentFill = Brick.blue.withAlphaComponent(0.16)
+    static let accentText = Brick.blueText
 
     static func dynamic(light: NSColor, dark: NSColor) -> NSColor {
         NSColor(name: nil) { $0.isDark ? dark : light }
@@ -84,6 +87,21 @@ enum Glass {
         ])
         return card
     }
+}
+
+/// The interface palette: bright toy-brick blue, yellow, green and orange, and no red.
+/// `…Text` variants are darker in Light mode and lighter in Dark mode, so small text stays readable.
+enum Brick {
+    static let blue = NSColor(srgbRed: 0, green: 0.424, blue: 0.718, alpha: 1)        // #006CB7
+    static let yellow = NSColor(srgbRed: 1, green: 0.804, blue: 0.012, alpha: 1)      // #FFCD03
+    static let green = NSColor(srgbRed: 0, green: 0.651, blue: 0.314, alpha: 1)       // #00A650
+    static let orange = NSColor(srgbRed: 0.961, green: 0.490, blue: 0.125, alpha: 1)  // #F57D20
+
+    static let blueText = Glass.dynamic(light: blue, dark: NSColor(srgbRed: 0.36, green: 0.66, blue: 1, alpha: 1))
+    static let greenText = Glass.dynamic(light: NSColor(srgbRed: 0, green: 0.48, blue: 0.23, alpha: 1),
+                                         dark: NSColor(srgbRed: 0.36, green: 0.85, blue: 0.55, alpha: 1))
+    static let orangeText = Glass.dynamic(light: NSColor(srgbRed: 0.70, green: 0.32, blue: 0, alpha: 1),
+                                          dark: NSColor(srgbRed: 1, green: 0.66, blue: 0.33, alpha: 1))
 }
 
 extension NSAppearance {
@@ -196,8 +214,8 @@ final class CapsuleButton: NSButton {
         let text: NSColor, fill: NSColor, edge: NSColor
         switch style {
         case .glass: text = .labelColor; fill = Glass.raised; edge = Glass.edge
-        case .prominent: text = .white; fill = .controlAccentColor; edge = .clear
-        case .destructive: text = .systemRed; fill = Glass.raised; edge = Glass.edge
+        case .prominent: text = Glass.accentText; fill = Glass.accentFill; edge = Glass.edge
+        case .destructive: text = Brick.orangeText; fill = Glass.raised; edge = Glass.edge
         case .done: text = Glass.doneText; fill = Glass.doneFill; edge = .clear
         case .plain: text = .secondaryLabelColor; fill = .clear; edge = .clear
         }

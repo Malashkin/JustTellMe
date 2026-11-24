@@ -774,7 +774,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         if done { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
         let s = NSMutableAttributedString(string: i.text, attributes: attrs)
         if kind == .tasks, let d = ListFilter.detail(i, now: Date()) {
-            let color: NSColor = ListFilter.isOverdue(i, now: Date()) ? .systemRed : .tertiaryLabelColor
+            let color: NSColor = ListFilter.isOverdue(i, now: Date()) ? Brick.orangeText : .tertiaryLabelColor
             s.append(NSAttributedString(string: "\n" + d, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: para]))
         }
         return s

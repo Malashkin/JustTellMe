@@ -21,6 +21,7 @@ app supports macOS 13+ and is built with the Command Line Tools, whose SDK (14.4
   resolved for the view's appearance (`cg(_:)`), so Light and Dark mode both work.
 - Floating panels (recording pill, cards) clip their behind-window blur with a stretchable `maskImage`;
   `layer.cornerRadius` does not clip that blur.
+- Colors come from one palette, `Brick`: blue #006CB7, yellow #FFCD03, green #00A650, orange #F57D20, with darker/lighter text variants for Light/Dark mode. There is no red: destructive actions and overdue dates are orange. Window buttons and system alerts keep their system colors.
 - Native controls stay where they work well (pop-up menus inside a glass capsule, checkboxes, settings).
 
 ## Consequences

@@ -350,11 +350,15 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         v.cacheDisplay(in: v.bounds, to: rep)
         backdrop.isHidden = false
         let size = v.bounds.size
+        let dark = v.effectiveAppearance.isDark
         let out = NSImage(size: size, flipped: false) { rect in
-            NSGradient(colors: [NSColor(calibratedRed: 0.97, green: 0.85, blue: 0.77, alpha: 1),
-                                NSColor(calibratedRed: 0.84, green: 0.86, blue: 0.99, alpha: 1),
-                                NSColor(calibratedRed: 0.80, green: 0.93, blue: 0.93, alpha: 1)])?.draw(in: rect, angle: -35)
-            NSColor.white.withAlphaComponent(0.35).setFill()
+            let colors = dark
+                ? [NSColor(calibratedRed: 0.24, green: 0.18, blue: 0.16, alpha: 1), NSColor(calibratedRed: 0.14, green: 0.16, blue: 0.24, alpha: 1),
+                   NSColor(calibratedRed: 0.10, green: 0.20, blue: 0.20, alpha: 1)]
+                : [NSColor(calibratedRed: 0.97, green: 0.85, blue: 0.77, alpha: 1), NSColor(calibratedRed: 0.84, green: 0.86, blue: 0.99, alpha: 1),
+                   NSColor(calibratedRed: 0.80, green: 0.93, blue: 0.93, alpha: 1)]
+            NSGradient(colors: colors)?.draw(in: rect, angle: -35)
+            (dark ? NSColor.black.withAlphaComponent(0.25) : NSColor.white.withAlphaComponent(0.35)).setFill()
             rect.fill(using: .sourceOver)
             rep.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             return true
