@@ -757,11 +757,11 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private static let textFont = NSFont.systemFont(ofSize: 13)
     /// Top inset of the entry text in its cell.
     private static let textTop: CGFloat = 6
-    /// Where the first line of the entry text sits, measured from the top of the row.
-    private static let textBaseline: CGFloat = {
-        let probe = NSTextField(wrappingLabelWithString: "Ag")
+    /// Height of one line of entry text: controls in front of an entry are centred on it.
+    static let firstLineHeight: CGFloat = {
+        let probe = NSTextField(labelWithString: "Ag")
         probe.font = textFont
-        return textTop + probe.firstBaselineOffsetFromTop
+        return probe.fittingSize.height
     }()
 
     private func itemText(_ i: ListItem) -> NSAttributedString {
@@ -805,9 +805,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             cell.addSubview(control)
             NSLayoutConstraint.activate([
                 control.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                // The status menu sits on the same baseline as the task text; the checkbox has no text to align.
-                id == "check" ? control.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8)
-                              : control.firstBaselineAnchor.constraint(equalTo: cell.topAnchor, constant: Self.textBaseline),
+                // The checkbox and the status capsule are centred on the first line of the entry text.
+                control.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: Self.textTop + Self.firstLineHeight / 2),
             ])
             return cell
         }
