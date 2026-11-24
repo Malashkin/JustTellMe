@@ -1,6 +1,6 @@
 # Test Results
 
-**Date:** 2026-11-24 (v1.2.0 + voice lists + English interface, branch `feat/voice-notes`) · **Status:** 🟢 PASS
+**Date:** 2026-11-24 (v1.3.0) · **Status:** 🟢 PASS
 **Stack:** Swift 5.10 + C shim (whisper.cpp), macOS desktop app, Command Line Tools only (no XCTest)
 **Runner:** `scripts/test.sh` (a test executable built from `Sources/App` + `Tests/`; `JTM_SKIP_SLOW=1` skips speech recognition)
 **Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched. **Language:** the suite runs with the Russian interface (`JTM_LANG=ru`); `LocalizationTests` switch to English.

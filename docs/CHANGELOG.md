@@ -10,6 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-11-24
+
 ### Added
 - **English interface.** The app follows the system language: English, or Russian when macOS prefers Russian. Default lists are Notes/Tasks with the command words Note/Task in English, Заметки/Задачи with Заметка/Задача in Russian. `JTM_LANG=en|ru` forces a language.
 - **Voice lists.** Start a dictation with a list's command word and the rest of the phrase is saved to that list instead of being pasted: “Note: call the bank” → Notes, “Task: send the report” → Tasks (on a Russian system «Заметка: позвонить в банк» → Заметки, «Задача: отправить отчёт» → Задачи). A “Saved to “…”” card confirms it, with a button to open the list. Each list is a page in the sidebar; nothing goes to the Home feed or the stats.
