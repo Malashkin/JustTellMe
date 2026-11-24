@@ -131,11 +131,11 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-window out-prefix [--ok]   (renders every page of the main window with the real history, for checking the layout)
+//   JustTellMe --demo-window out-prefix [--ok] [--dark]   (renders every page of the main window with the real history, for checking the layout)
 if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
-    app.appearance = NSAppearance(named: .aqua)
+    app.appearance = NSAppearance(named: args.contains("--dark") ? .darkAqua : .aqua)
     let w = MainWindow()
     // --ok: every permission granted (screenshots); otherwise one warning shows, to check that layout too.
     let allOK = args.contains("--ok")

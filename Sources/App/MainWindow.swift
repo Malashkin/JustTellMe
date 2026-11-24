@@ -45,6 +45,11 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
     private let content = NSView()
     /// The blurred desktop behind everything.
     private let backdrop = Glass.backdrop()
+    /// Auto / Light / Dark at the bottom of the sidebar.
+    private let themeControl = CapsuleSegments(Prefs.Theme.allCases.map(\.title), symbols: Prefs.Theme.allCases.map(\.symbol))
+
+    /// Where the window buttons sit: inside the sidebar panel (10 pt from the window edge) with room around them.
+    static let windowButtonsInset = NSPoint(x: 26, y: 24)
     private var timer: Timer?
     private var items: [Item] = []
     private(set) var current: Item = .page(.home)
@@ -74,6 +79,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        placeWindowButtons()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in self?.refresh() }
     }
@@ -87,6 +93,29 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         default: break
         }
     }
+
+    /// Move the close/minimise/zoom buttons into the sidebar panel. macOS lays them out again on resize,
+    /// key changes and full screen, so this runs after each of those.
+    func placeWindowButtons() {
+        guard let w = window, !w.styleMask.contains(.fullScreen),
+              let close = w.standardWindowButton(.closeButton), let mini = w.standardWindowButton(.miniaturizeButton),
+              let zoom = w.standardWindowButton(.zoomButton), let titlebar = close.superview?.superview else { return }
+        let inset = Self.windowButtonsInset
+        let spacing: CGFloat = 20
+        let height = inset.y * 2
+        // Only as wide as the buttons, so the rest of the top edge stays clickable for the page under it.
+        titlebar.frame = NSRect(x: 0, y: w.frame.height - height, width: inset.x * 2 + spacing * 2, height: height)
+        for (i, b) in [close, mini, zoom].enumerated() {
+            b.setFrameOrigin(NSPoint(x: inset.x - b.frame.width / 2 + CGFloat(i) * spacing,
+                                     y: (height - b.frame.height) / 2))
+        }
+    }
+
+    func windowDidResize(_ notification: Notification) { placeWindowButtons() }
+    func windowDidEndLiveResize(_ notification: Notification) { placeWindowButtons() }
+    func windowDidExitFullScreen(_ notification: Notification) { placeWindowButtons() }
+    func windowDidBecomeKey(_ notification: Notification) { placeWindowButtons() }
+    func windowDidResignKey(_ notification: Notification) { placeWindowButtons() }
 
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate()
@@ -157,6 +186,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             return
         }
         window?.title = title
+        placeWindowButtons()
         if pane.superview === content { return }
         content.subviews.forEach { $0.removeFromSuperview() }
         pane.translatesAutoresizingMaskIntoConstraints = false
@@ -202,6 +232,8 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         w.titleVisibility = .hidden
         w.isOpaque = false
         w.backgroundColor = .clear
+        // The title bar is only as wide as the window buttons: the window is dragged by its empty glass.
+        w.isMovableByWindowBackground = true
         w.setFrameAutosaveName("JustTellMeMain")
         if !w.setFrameUsingName("JustTellMeMain") { w.center() }
 
@@ -220,16 +252,22 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         sideScroll.drawsBackground = false
         sideScroll.automaticallyAdjustsContentInsets = false
         // Room for the window buttons, which sit on the sidebar panel.
-        sideScroll.contentInsets = NSEdgeInsets(top: 40, left: 0, bottom: 8, right: 0)
+        sideScroll.contentInsets = NSEdgeInsets(top: 44, left: 0, bottom: 8, right: 0)
 
         let root = NSView()
         backdrop.autoresizingMask = [.width, .height]
         root.addSubview(backdrop)
         let side = GlassView(radius: 20)
         for v in [side, content] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(v) }
-        sideScroll.translatesAutoresizingMaskIntoConstraints = false
-        side.addSubview(sideScroll)
+        themeControl.onChange = { Prefs.theme = Prefs.Theme.allCases[$0] }
+        themeControl.selected = Prefs.Theme.allCases.firstIndex(of: Prefs.theme) ?? 0
+        NotificationCenter.default.addObserver(forName: Prefs.themeChanged, object: nil, queue: .main) { [weak self] _ in
+            self?.themeControl.selected = Prefs.Theme.allCases.firstIndex(of: Prefs.theme) ?? 0
+        }
+        for v in [sideScroll, themeControl] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; side.addSubview(v) }
         NSLayoutConstraint.activate([
+            themeControl.centerXAnchor.constraint(equalTo: side.centerXAnchor),
+            themeControl.bottomAnchor.constraint(equalTo: side.bottomAnchor, constant: -12),
             side.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
             side.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
             side.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
@@ -237,7 +275,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             sideScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor, constant: 6),
             sideScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor, constant: -6),
             sideScroll.topAnchor.constraint(equalTo: side.topAnchor),
-            sideScroll.bottomAnchor.constraint(equalTo: side.bottomAnchor),
+            sideScroll.bottomAnchor.constraint(equalTo: themeControl.topAnchor, constant: -8),
             content.leadingAnchor.constraint(equalTo: side.trailingAnchor, constant: 4),
             content.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             content.topAnchor.constraint(equalTo: root.topAnchor),

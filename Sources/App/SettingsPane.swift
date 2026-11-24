@@ -41,6 +41,7 @@ final class SettingsPane: NSObject {
     private let updatesBox = NSButton(checkboxWithTitle: tr("Check for updates daily", "Проверять обновления раз в день"), target: nil, action: nil)
     private let checkNow = NSButton(title: tr("Check Now", "Проверить сейчас"), target: nil, action: nil)
     private let updateStatus = NSTextField(labelWithString: "")
+    private let themeControl = CapsuleSegments(Prefs.Theme.allCases.map(\.title))
 
     private static var languages: [(String, String)] {
         [("auto", tr("Auto (Russian/English, prefers Russian)", "Авто (ru/en, с уклоном в ru)")),
@@ -75,7 +76,9 @@ final class SettingsPane: NSObject {
                              "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена.")
         let addModel = NSButton(title: tr("Add from File…", "Добавить из файла…"), target: self, action: #selector(addModel))
 
+        themeControl.onChange = { Prefs.theme = Prefs.Theme.allCases[$0] }
         let grid = NSGridView(views: [
+            [caption(tr("Appearance", "Оформление")), themeControl],
             [caption(tr("Dictation key", "Клавиша диктовки")), keyPopup],
             [caption(tr("How the key works", "Как работает клавиша")), triggerPopup],
             [NSGridCell.emptyContentView, note(tr("Esc cancels recording or transcription.", "Esc — отменить запись или распознавание."))],
@@ -99,7 +102,9 @@ final class SettingsPane: NSObject {
         grid.columnSpacing = 14
         grid.column(at: 0).xPlacement = .trailing
         grid.rowAlignment = .firstBaseline
-        for i in [2, 6, 8, 10, 14, 17] { grid.row(at: i).topPadding = -6 }
+        grid.row(at: 0).yPlacement = .center
+        grid.row(at: 0).rowAlignment = .none
+        for i in [3, 7, 9, 11, 15, 18] { grid.row(at: i).topPadding = -6 }
         updateStatus.font = .systemFont(ofSize: 11)
         updateStatus.textColor = .secondaryLabelColor
         neuralStatus.preferredMaxLayoutWidth = 440
@@ -138,6 +143,7 @@ final class SettingsPane: NSObject {
         _ = view
         if let k = host?.hotkeyKey, let i = PushToTalkHotkey.Key.allCases.firstIndex(of: k) { keyPopup.selectItem(at: i) }
         if let i = Prefs.Trigger.allCases.firstIndex(of: Prefs.trigger) { triggerPopup.selectItem(at: i) }
+        themeControl.selected = Prefs.Theme.allCases.firstIndex(of: Prefs.theme) ?? 0
         if let i = Self.languages.firstIndex(where: { $0.0 == (host?.languageCode ?? "auto") }) { langPopup.selectItem(at: i) }
         if let i = Self.unloadOptions.firstIndex(where: { $0.0 == Prefs.unloadAfterMinutes }) { unloadPopup.selectItem(at: i) }
 

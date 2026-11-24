@@ -66,6 +66,36 @@ enum GlassTests {
             T.ok(abs(centre(cell("status")) - text) <= 1, "status capsule \(centre(cell("status"))) vs text line \(text)")
             T.ok(abs(centre(cell("check")) - text) <= 1, "checkbox \(centre(cell("check"))) vs text line \(text)")
         }
+        T.test("theme: Auto / Light / Dark is saved, applied and announced") {
+            let saved = Prefs.theme
+            defer { Prefs.theme = saved }
+            T.eq(Prefs.Theme.system.appearance, nil, "Auto follows macOS")
+            T.eq(Prefs.Theme.light.appearance?.name, .aqua)
+            T.eq(Prefs.Theme.dark.appearance?.name, .darkAqua)
+            var told = 0
+            let o = NotificationCenter.default.addObserver(forName: Prefs.themeChanged, object: nil, queue: nil) { _ in told += 1 }
+            defer { NotificationCenter.default.removeObserver(o) }
+            Prefs.theme = .dark
+            T.eq(Prefs.theme, .dark)
+            T.eq(UserDefaults.standard.string(forKey: "theme"), "dark")
+            T.eq(told, 1)
+            T.eq(Prefs.Theme.allCases.map(\.symbol).count, 3)
+        }
+        T.test("theme: icon-only switch keeps titles for VoiceOver but draws no text") {
+            let s = CapsuleSegments(["Auto", "Light", "Dark"], symbols: ["circle.lefthalf.filled", "sun.max", "moon"])
+            let buttons = s.subviews.flatMap(\.subviews).compactMap { $0 as? CapsuleButton }
+            T.eq(buttons.map(\.title), ["Auto", "Light", "Dark"])
+            T.ok(buttons.allSatisfy { $0.imagePosition == .imageOnly }, "only the icon is drawn")
+            T.ok(buttons.allSatisfy { $0.image != nil && $0.toolTip != nil }, "icons and tooltips")
+            T.eq(buttons[0].intrinsicContentSize.width, 40)
+        }
+        T.test("window buttons sit inside the sidebar panel") {
+            let inset = MainWindow.windowButtonsInset
+            let panel = NSRect(x: 10, y: 10, width: 210, height: 600)   // sidebar panel, from the top-left
+            let close = NSRect(x: inset.x - 7, y: inset.y - 7, width: 14, height: 14)
+            T.ok(close.minX - panel.minX >= 8 && close.minY - panel.minY >= 6, "room between the buttons and the panel edge")
+            T.ok(inset.y * 2 < 52, "the button strip ends above the page title")
+        }
         T.test("glass: the backdrop mask stretches with the view") {
             let m = Glass.mask(radius: 22)
             T.eq(m.resizingMode, .stretch)

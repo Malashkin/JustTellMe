@@ -49,7 +49,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--stream file.wav` plays the file in real time through the streaming path and prints the wait after "release"
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
-- `--demo-overlay [out.png]`, `--demo-window out-prefix [--ok]` (`--ok`: all permissions granted, for screenshots), `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the “No text field?” card or the “Saved to “Notes”” card to PNG
+- `--demo-overlay [out.png]`, `--demo-window out-prefix [--ok] [--dark]` (`--ok`: all permissions granted, for screenshots; `--dark`: Dark mode; `JTM_DEMO_DELAY=<s>`: seconds per page), `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the “No text field?” card or the “Saved to “Notes”” card to PNG
 - `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings; `--idle-unload file.wav` checks the idle timer
 - `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
 - `--update-check [--page]`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app [--zip file.zip --version X]` drive the updater

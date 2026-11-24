@@ -116,6 +116,7 @@ Everything you dictate is kept on **Home**, grouped by day, with the app it went
 ![Settings](docs/images/settings.png)
 
 Every option is also available from the 🎙 menu in the menu bar:
+- appearance: Auto, Light or Dark (also at the bottom of the sidebar);
 - the dictation key and how it works;
 - language and microphone;
 - the model (built-in, from a file, or downloaded);
@@ -215,7 +216,7 @@ The binary `JustTellMe.app/Contents/MacOS/JustTellMe` accepts hidden flags:
 - `--audio-info [--test-mute]`
 - `--demo-paste "text"`
 - `--demo-overlay [out.png]`
-- `--demo-window out-prefix [--ok]`: PNGs of every page of the main window
+- `--demo-window out-prefix [--ok] [--dark]`: PNGs of every page of the main window
 - `--demo-card out.png`
 - `--demo-note-card out.png`
 - `--unload-cycle file.wav`

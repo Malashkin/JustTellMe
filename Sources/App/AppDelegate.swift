@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        Prefs.applyTheme()
         installEditMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         buildMenu()
@@ -665,6 +666,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let clip = item(tr("Restore Previous Clipboard After Pasting", "Возвращать прежний буфер обмена после вставки"), #selector(toggleClipboard), on: Prefs.restoreClipboard)
         clip.toolTip = tr("If turned off, the dictated text stays on the clipboard. Clipboard managers (Maccy, Raycast, Paste) don't save dictated text while this option is on.", "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена.")
         m.addItem(.separator())
+        header(tr("Appearance", "Оформление"))
+        for t in Prefs.Theme.allCases { _ = item(t.title, #selector(pickTheme(_:)), on: Prefs.theme == t, t.rawValue) }
+        m.addItem(.separator())
 
         let micRoot = NSMenuItem(title: tr("Microphone", "Микрофон"), action: nil, keyEquivalent: "")
         let mics = NSMenu(); mics.autoenablesItems = false
@@ -768,6 +772,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleSounds() { Prefs.sounds.toggle() }
     @objc private func toggleMute() { Prefs.muteWhileRecording.toggle() }
     @objc private func toggleClipboard() { Prefs.restoreClipboard.toggle() }
+    @objc private func pickTheme(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let t = Prefs.Theme(rawValue: raw) { Prefs.theme = t }
+    }
     @objc private func pickMic(_ sender: NSMenuItem) { Prefs.micUID = sender.representedObject as? String }
     @objc private func pickUnload(_ sender: NSMenuItem) {
         Prefs.unloadAfterMinutes = sender.representedObject as? Int ?? 0

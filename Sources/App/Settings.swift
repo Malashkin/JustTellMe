@@ -15,7 +15,39 @@ enum Prefs {
         }
     }
 
+    /// Light or dark interface; `system` follows macOS.
+    enum Theme: String, CaseIterable {
+        case system, light, dark
+        var title: String {
+            switch self {
+            case .system: return tr("Auto", "Авто")
+            case .light: return tr("Light", "Светлая")
+            case .dark: return tr("Dark", "Тёмная")
+            }
+        }
+        var symbol: String { ["circle.lefthalf.filled", "sun.max", "moon"][Self.allCases.firstIndex(of: self)!] }
+        var appearance: NSAppearance? {
+            switch self {
+            case .system: return nil
+            case .light: return NSAppearance(named: .aqua)
+            case .dark: return NSAppearance(named: .darkAqua)
+            }
+        }
+    }
+    static let themeChanged = Notification.Name("JustTellMeThemeChanged")
+
     private static let d = UserDefaults.standard
+
+    static var theme: Theme {
+        get { Theme(rawValue: d.string(forKey: "theme") ?? "") ?? .system }
+        set {
+            d.set(newValue.rawValue, forKey: "theme")
+            applyTheme()
+            NotificationCenter.default.post(name: themeChanged, object: nil)
+        }
+    }
+    /// Apply the chosen theme to every window, the recording pill and the cards.
+    static func applyTheme() { NSApp?.appearance = theme.appearance }
 
     static var trigger: Trigger {
         get { Trigger(rawValue: d.string(forKey: "trigger") ?? "") ?? .holdOrDoubleTap }

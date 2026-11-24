@@ -144,6 +144,8 @@ final class CapsuleButton: NSButton {
     var height: CGFloat = 30 { didSet { invalidateIntrinsicContentSize() } }
     var padding: CGFloat = 14 { didSet { invalidateIntrinsicContentSize() } }
     var fontSize: CGFloat = 13 { didSet { restyle() } }
+    /// Show only `image`; the title stays for tooltips and VoiceOver.
+    var iconOnly = false { didSet { imagePosition = iconOnly ? .imageOnly : .noImage; restyle() } }
 
     init(_ title: String, style: Style = .glass, target: AnyObject? = nil, action: Selector? = nil) {
         self.style = style
@@ -163,6 +165,7 @@ final class CapsuleButton: NSButton {
     override var isEnabled: Bool { didSet { alphaValue = isEnabled ? 1 : 0.45 } }
 
     override var intrinsicContentSize: NSSize {
+        if iconOnly { return NSSize(width: height + 12, height: height) }
         let w = attributedTitle.size().width
         return NSSize(width: ceil(w) + padding * 2, height: height)
     }
@@ -200,12 +203,15 @@ final class CapsuleButton: NSButton {
         }
         layer?.backgroundColor = cg(fill)
         layer?.borderColor = cg(edge)
+        contentTintColor = style == .plain ? .secondaryLabelColor : text
         let para = NSMutableParagraphStyle()
         para.alignment = .center
+        // An icon-only capsule keeps its title (VoiceOver, tooltips); `.imageOnly` stops it being drawn.
         attributedTitle = NSAttributedString(string: title, attributes: [
             .font: NSFont.systemFont(ofSize: fontSize, weight: style == .glass || style == .plain ? .regular : .semibold),
             .foregroundColor: text, .paragraphStyle: para,
         ])
+        if iconOnly { imagePosition = .imageOnly }   // setting the title resets it
         invalidateIntrinsicContentSize()
     }
 }
@@ -236,13 +242,20 @@ final class CapsuleSegments: GlassView {
     private var buttons: [CapsuleButton] = []
     var selected = 0 { didSet { restyle() } }
 
-    init(_ titles: [String]) {
+    /// `symbols`: SF Symbol names to show instead of the titles (the titles become tooltips and labels).
+    init(_ titles: [String], symbols: [String]? = nil) {
         super.init(radius: 17)
         capsule = true
         let stack = NSStackView()
         stack.spacing = 2
         for (i, t) in titles.enumerated() {
             let b = CapsuleButton(t, style: .plain, target: self, action: #selector(pick(_:)))
+            if let name = symbols?[i] {
+                b.image = NSImage(systemSymbolName: name, accessibilityDescription: t)
+                b.iconOnly = true
+                b.toolTip = t
+                b.setAccessibilityLabel(t)
+            }
             b.tag = i
             b.height = 28
             buttons.append(b)
