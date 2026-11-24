@@ -131,13 +131,15 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-window out-prefix   (renders every page of the main window with the real history, for checking the layout)
+//   JustTellMe --demo-window out-prefix [--ok]   (renders every page of the main window with the real history, for checking the layout)
 if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.appearance = NSAppearance(named: .aqua)
     let w = MainWindow()
-    w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: false, modelReady: true) }
+    // --ok: every permission granted (screenshots); otherwise one warning shows, to check that layout too.
+    let allOK = args.contains("--ok")
+    w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: allOK, modelReady: true) }
     var pages = w.demoItems
     var n = 0
     func next() {

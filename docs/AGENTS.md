@@ -49,7 +49,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--stream file.wav` plays the file in real time through the streaming path and prints the wait after "release"
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
-- `--demo-overlay [out.png]`, `--demo-window out-prefix`, `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the “No text field?” card or the “Saved to “Notes”” card to PNG
+- `--demo-overlay [out.png]`, `--demo-window out-prefix [--ok]` (`--ok`: all permissions granted, for screenshots), `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the “No text field?” card or the “Saved to “Notes”” card to PNG
 - `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings; `--idle-unload file.wav` checks the idle timer
 - `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
 - `--update-check [--page]`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app [--zip file.zip --version X]` drive the updater
@@ -64,6 +64,10 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - Preferences go through `Prefs` (`Sources/App/Settings.swift`). A setting appears both in the menu-bar Settings submenu and on the Settings page (`SettingsPane`), so keep the two in sync.
 - Pure logic (stats, text cleanup, cut points, learning, vocabulary) lives in `static func`s, so it can be unit-tested.
 - Commit after each finished change and push to `github.com/Malashkin/JustTellMe`. End messages with the `Co-Authored-By` line.
+
+## README screenshots
+
+`docs/images/*.png` are rendered from sample data, never from real history: `JTM_LANG=en JTM_SUPPORT_DIR=<folder with sample lists.json, list-*.json, history.json> JustTellMe --demo-window out --ok`, plus `--demo-note-card` and `--demo-overlay`, then resized to 1600 px wide (`sips -Z 1600`). Dates in sample JSON must have no fractional seconds.
 
 ## Do not edit / generated zones
 
