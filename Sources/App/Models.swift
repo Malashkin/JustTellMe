@@ -21,14 +21,14 @@ struct CuratedModel {
 final class ModelManager: NSObject, URLSessionDownloadDelegate {
     static let defaultFile = "ggml-large-v3-turbo-q5_0.bin"
 
-    static let curated: [CuratedModel] = [
-        .init(file: "ggml-small-q5_1.bin", title: "small q5_1 — 190 МБ, быстрая, слабее", bytes: 190_085_487),
-        .init(file: "ggml-small.bin", title: "small — 488 МБ", bytes: 487_601_967),
-        .init(file: "ggml-medium-q5_0.bin", title: "medium q5_0 — 539 МБ", bytes: 539_212_467),
-        .init(file: "ggml-large-v3-turbo-q8_0.bin", title: "large-v3-turbo q8_0 — 874 МБ, точнее q5", bytes: 874_188_075),
-        .init(file: "ggml-large-v3-q5_0.bin", title: "large-v3 q5_0 — 1.1 ГБ, точная, медленнее", bytes: 1_081_140_203),
-        .init(file: "ggml-large-v3-turbo.bin", title: "large-v3-turbo f16 — 1.6 ГБ, максимум точности turbo", bytes: 1_624_555_275),
-    ]
+    static var curated: [CuratedModel] { [
+        .init(file: "ggml-small-q5_1.bin", title: tr("small q5_1 — 190 MB, fast, less accurate", "small q5_1 — 190 МБ, быстрая, слабее"), bytes: 190_085_487),
+        .init(file: "ggml-small.bin", title: tr("small — 488 MB", "small — 488 МБ"), bytes: 487_601_967),
+        .init(file: "ggml-medium-q5_0.bin", title: tr("medium q5_0 — 539 MB", "medium q5_0 — 539 МБ"), bytes: 539_212_467),
+        .init(file: "ggml-large-v3-turbo-q8_0.bin", title: tr("large-v3-turbo q8_0 — 874 MB, more accurate than q5", "large-v3-turbo q8_0 — 874 МБ, точнее q5"), bytes: 874_188_075),
+        .init(file: "ggml-large-v3-q5_0.bin", title: tr("large-v3 q5_0 — 1.1 GB, accurate, slower", "large-v3 q5_0 — 1.1 ГБ, точная, медленнее"), bytes: 1_081_140_203),
+        .init(file: "ggml-large-v3-turbo.bin", title: tr("large-v3-turbo f16 — 1.6 GB, most accurate turbo", "large-v3-turbo f16 — 1.6 ГБ, максимум точности turbo"), bytes: 1_624_555_275),
+    ] }
 
     /// Progress callback: (file, fraction 0...1) while downloading; (file, nil) when finished/failed.
     var onProgress: ((String, Double?) -> Void)?
@@ -72,7 +72,7 @@ final class ModelManager: NSObject, URLSessionDownloadDelegate {
 
     enum ImportError: LocalizedError {
         case notGGML
-        var errorDescription: String? { "Это не модель whisper.cpp (ggml .bin)." }
+        var errorDescription: String? { tr("This isn't a whisper.cpp model (ggml .bin).", "Это не модель whisper.cpp (ggml .bin).") }
     }
 
     static func importModel(from src: URL) throws -> ModelInfo {

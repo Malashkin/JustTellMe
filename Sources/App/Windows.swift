@@ -58,11 +58,14 @@ final class VocabularyPane: NSObject, NSTextViewDelegate {
         promptView.string = v.basePrompt
         dictView.string = (try? String(contentsOf: Paths.dictionary, encoding: .utf8)) ?? Vocabulary.dictionaryHeader
         rulesView.string = (try? String(contentsOf: Paths.replacements, encoding: .utf8)) ?? Vocabulary.replacementsHeader
-        builtinView.string = "СЛОВА (\(v.builtinTerms.count); * = в подсказке):\n"
+        builtinView.string = tr("WORDS (\(v.builtinTerms.count); * = in prompt):\n", "СЛОВА (\(v.builtinTerms.count); * = в подсказке):\n")
             + v.builtinTerms.map { v.builtinPromptTerms.contains($0) ? "* " + $0 : $0 }.joined(separator: ", ")
-            + "\n\nЗАМЕНЫ (\(v.builtinRules.count)):\n"
+            + tr("\n\nREPLACEMENTS (\(v.builtinRules.count)):\n", "\n\nЗАМЕНЫ (\(v.builtinRules.count)):\n")
             + v.builtinRules.sorted { $0.from < $1.from }.map { "\($0.from) → \($0.to)" }.joined(separator: "\n")
-        builtinToggle.title = "Использовать встроенный словарь (\(v.builtinTerms.count) слов, \(v.builtinRules.count) замен) — только чтение"
+        let terms = v.builtinTerms.count, rules = v.builtinRules.count
+        builtinToggle.title = L10n.isRussian
+            ? "Использовать встроенный словарь (\(terms) слов, \(rules) замен) — только чтение"
+            : "Use built-in dictionary (\(terms) \(terms == 1 ? "word" : "words"), \(rules) \(rules == 1 ? "replacement" : "replacements")), read-only"
         builtinToggle.state = v.builtinEnabled ? .on : .off
     }
 
@@ -78,18 +81,18 @@ final class VocabularyPane: NSObject, NSTextViewDelegate {
 
         builtinToggle = NSButton(checkboxWithTitle: "", target: self, action: #selector(toggleBuiltin))
 
-        let save = NSButton(title: "Сохранить", target: self, action: #selector(saveAction))
+        let save = NSButton(title: tr("Save", "Сохранить"), target: self, action: #selector(saveAction))
         save.keyEquivalent = "\r"
-        let folder = NSButton(title: "Открыть папку", target: self, action: #selector(openFolder))
-        let reset = NSButton(title: "Подсказка по умолчанию", target: self, action: #selector(resetPrompt))
+        let folder = NSButton(title: tr("Open Folder", "Открыть папку"), target: self, action: #selector(openFolder))
+        let reset = NSButton(title: tr("Default Prompt", "Подсказка по умолчанию"), target: self, action: #selector(resetPrompt))
         savedLabel.textColor = .secondaryLabelColor
         let buttons = NSStackView(views: [reset, folder, NSView(), savedLabel, save])
         buttons.orientation = .horizontal
 
         let stack = NSStackView(views: [
-            label("Подсказка (initial prompt) — задаёт стиль и смешение языков:", bold: true), ps,
-            label("Личный словарь — ваши термины, имена, бренды (по одному на строку):", bold: true), ds,
-            label("Личные замены после распознавания: «неправильно => правильно»:", bold: true), rs,
+            label(tr("Prompt (initial prompt): sets the style and language mixing:", "Подсказка (initial prompt) — задаёт стиль и смешение языков:"), bold: true), ps,
+            label(tr("Personal dictionary: your terms, names and brands (one per line):", "Личный словарь — ваши термины, имена, бренды (по одному на строку):"), bold: true), ds,
+            label(tr("Personal replacements after transcription: “wrong => right”:", "Личные замены после распознавания: «неправильно => правильно»:"), bold: true), rs,
             builtinToggle, bs,
             buttons,
         ])
@@ -120,7 +123,7 @@ final class VocabularyPane: NSObject, NSTextViewDelegate {
         Vocabulary.shared.save(prompt: promptView.string, dictionary: dictView.string, replacements: rulesView.string)
         dirty = false
         reload()
-        savedLabel.stringValue = "Сохранено ✓"
+        savedLabel.stringValue = tr("Saved ✓", "Сохранено ✓")
     }
 
     @objc private func resetPrompt() { promptView.string = Vocabulary.defaultPrompt; dirty = true }
@@ -137,20 +140,21 @@ final class CorrectionWindow: NSObject {
 
     func open(original: String) {
         self.original = original
-        let w = window ?? makeWindow("JustTellMe — Исправить последнюю фразу", NSSize(width: 560, height: 320))
+        let w = window ?? makeWindow(tr("JustTellMe — Correct Last Phrase", "JustTellMe — Исправить последнюю фразу"), NSSize(width: 560, height: 320))
         window = w
-        let orig = label("Распознано: \(original)")
+        let orig = label(tr("Recognized: \(original)", "Распознано: \(original)"))
         orig.textColor = .secondaryLabelColor
         orig.isSelectable = true
         let (es, ev) = makeTextView(original)
         ev.font = NSFont.systemFont(ofSize: 15)
         editView = ev
-        let save = NSButton(title: "Запомнить исправление", target: self, action: #selector(saveAction))
+        let save = NSButton(title: tr("Remember Correction", "Запомнить исправление"), target: self, action: #selector(saveAction))
         save.keyEquivalent = "\r"
-        let cancel = NSButton(title: "Отмена", target: self, action: #selector(cancelAction))
+        let cancel = NSButton(title: tr("Cancel", "Отмена"), target: self, action: #selector(cancelAction))
         cancel.keyEquivalent = "\u{1b}"
         let buttons = NSStackView(views: [NSView(), cancel, save])
-        let hint = label("Исправьте текст как надо. Новые слова попадут в словарь, а изменённые фрагменты — в замены (их можно поправить в «Словарь…»).")
+        let hint = label(tr("Correct the text as needed. New words go to the dictionary and changed fragments go to replacements (you can edit them on the Dictionary page).",
+                         "Исправьте текст как надо. Новые слова попадут в словарь, а изменённые фрагменты — в замены (их можно поправить в «Словарь…»)."))
         hint.font = NSFont.systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [orig, es, hint, buttons])
@@ -184,14 +188,32 @@ final class CorrectionWindow: NSObject {
         onCorrected?(corrected)
 
         let a = NSAlert()
-        a.messageText = "Исправление запомнено"
+        a.messageText = tr("Correction Remembered", "Исправление запомнено")
         var info: [String] = []
-        if !terms.isEmpty { info.append("В словарь: " + terms.joined(separator: ", ")) }
-        if !rules.isEmpty { info.append("Замены:\n" + rules.map { "  \($0.0) → \($0.1)" }.joined(separator: "\n")) }
-        if info.isEmpty { info.append("Новых слов/замен не найдено (всё уже есть в словаре).") }
-        info.append("\nИсправленный текст скопирован в буфер обмена.")
+        if !terms.isEmpty { info.append(tr("Added to dictionary: ", "В словарь: ") + terms.joined(separator: ", ")) }
+        if !rules.isEmpty { info.append(tr("Replacements:\n", "Замены:\n") + rules.map { "  \($0.0) → \($0.1)" }.joined(separator: "\n")) }
+        if info.isEmpty { info.append(tr("No new words or replacements found (everything is already in the dictionary).", "Новых слов/замен не найдено (всё уже есть в словаре).")) }
+        info.append(tr("\nThe corrected text was copied to the clipboard.", "\nИсправленный текст скопирован в буфер обмена."))
         a.informativeText = info.joined(separator: "\n")
         NSApp.activate(ignoringOtherApps: true)
         a.runModal()
+    }
+}
+
+/// A table whose text can be selected with the mouse and copied with ⌘C, like in Notes or Mail.
+/// NSTableView normally keeps clicks for row selection; here a click or drag on selectable text goes to the text.
+/// ⌘C with no text selected copies the selected rows through `onCopy`.
+final class SelectableTextTableView: NSTableView, NSMenuItemValidation {
+    var onCopy: (() -> Void)?
+
+    override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
+        if let field = responder as? NSTextField, field.isSelectable { return true }
+        return super.validateProposedFirstResponder(responder, for: event)
+    }
+
+    @objc func copy(_ sender: Any?) { onCopy?() }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item.action == #selector(copy(_:)) ? onCopy != nil && !selectedRowIndexes.isEmpty : true
     }
 }

@@ -10,15 +10,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let lastLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let accessItem = NSMenuItem(title: "Разрешить Accessibility…", action: #selector(openAccessibility), keyEquivalent: "")
-    private let micItem = NSMenuItem(title: "Разрешить микрофон…", action: #selector(openMicSettings), keyEquivalent: "")
-    private let loginItem = NSMenuItem(title: "Запускать при входе", action: #selector(toggleLogin), keyEquivalent: "")
-    private let modelRoot = NSMenuItem(title: "Модель", action: nil, keyEquivalent: "")
-    private let fixItem = NSMenuItem(title: "Исправить последнюю фразу…", action: #selector(fixLast), keyEquivalent: "")
-    private let builtinItem = NSMenuItem(title: "Встроенный словарь ru/en", action: #selector(toggleBuiltin), keyEquivalent: "")
+    private let accessItem = NSMenuItem(title: tr("Allow Accessibility…", "Разрешить Accessibility…"), action: #selector(openAccessibility), keyEquivalent: "")
+    private let micItem = NSMenuItem(title: tr("Allow Microphone…", "Разрешить микрофон…"), action: #selector(openMicSettings), keyEquivalent: "")
+    private let loginItem = NSMenuItem(title: tr("Open at Login", "Запускать при входе"), action: #selector(toggleLogin), keyEquivalent: "")
+    private let modelRoot = NSMenuItem(title: tr("Model", "Модель"), action: nil, keyEquivalent: "")
+    private let fixItem = NSMenuItem(title: tr("Correct Last Phrase…", "Исправить последнюю фразу…"), action: #selector(fixLast), keyEquivalent: "")
+    private let builtinItem = NSMenuItem(title: tr("Built-in ru/en Dictionary", "Встроенный словарь ru/en"), action: #selector(toggleBuiltin), keyEquivalent: "")
     private var langItems: [String: NSMenuItem] = [:]
     private let secureItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let settingsRoot = NSMenuItem(title: "Настройки", action: nil, keyEquivalent: "")
+    private let settingsRoot = NSMenuItem(title: tr("Settings", "Настройки"), action: nil, keyEquivalent: "")
     private let updateItem = NSMenuItem(title: "", action: #selector(updateClicked), keyEquivalent: "")
 
     private let transcriber = Transcriber()
@@ -26,12 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let hotkey = PushToTalkHotkey(key: PushToTalkHotkey.Key(rawValue: UserDefaults.standard.string(forKey: "hotkey") ?? "") ?? .fn)
     private let main = MainWindow()
     private let overlay = RecordingOverlay()
-    private let historyRoot = NSMenuItem(title: "История", action: nil, keyEquivalent: "")
+    private let historyRoot = NSMenuItem(title: tr("History", "История"), action: nil, keyEquivalent: "")
     private var keyItems: [PushToTalkHotkey.Key: NSMenuItem] = [:]
     private let models = ModelManager()
     private let neural = NeuralEngine()
     private let fixWindow = CorrectionWindow()
     private let noFieldCard = NoFieldCard()
+    private let savedCard = SavedCard()
     let updater = Updater()
     private var repasteShortcut: GlobalShortcut?
     private var state: State = .loading
@@ -139,11 +140,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func loadActiveModel() {
-        guard let m = ModelManager.active() else { setState(.error("нет модели")); return }
+        guard let m = ModelManager.active() else { setState(.error(tr("no model", "нет модели"))); return }
         setState(.loading)
         // GPU first (ready in a second); the Neural Engine encoder is attached once macOS has prepared it.
         transcriber.load(m.url, encoder: neural.encoder(for: m.url)) { [weak self] ok in
-            self?.setState(ok ? .idle : .error("модель не загрузилась"))
+            self?.setState(ok ? .idle : .error(tr("the model failed to load", "модель не загрузилась")))
             self?.rebuildModelMenu()
         }
         neural.update(for: m.url)
@@ -160,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         transcriber.load(m.url, encoder: enc) { [weak self] ok in
             guard let self else { return }
             NSLog("JustTellMe: model reloaded, Neural Engine: \(self.transcriber.usesNeuralEngine)")
-            if !ok { self.setState(.error("модель не загрузилась")) }
+            if !ok { self.setState(.error(tr("the model failed to load", "модель не загрузилась"))) }
             self.rebuildModelMenu()
             self.rebuildSettingsMenu()
             self.main.refresh()
@@ -172,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func installEditMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); main.addItem(appItem)
-        let appMenu = NSMenu(); appMenu.addItem(withTitle: "Закрыть окно", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let appMenu = NSMenu(); appMenu.addItem(withTitle: tr("Close Window", "Закрыть окно"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         appItem.submenu = appMenu
         let editItem = NSMenuItem(); main.addItem(editItem)
         let e = NSMenu(title: "Edit")
@@ -263,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         } catch {
             NSLog("JustTellMe: mic start failed: \(error)")
-            setState(.error("микрофон недоступен"))
+            setState(.error(tr("the microphone is unavailable", "микрофон недоступен")))
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.setState(.idle) }
         }
     }
@@ -348,13 +349,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.lastResult = r.text
             self.updateStatusLine()
             let front = NSWorkspace.shared.frontmostApplication
+            if let hit = VoiceLists.shared.match(r.text) {
+                self.saveToList(hit.list, hit.body, lang: r.lang)
+                return
+            }
             History.shared.add(text: r.text, lang: r.lang, app: front?.localizedName, seconds: Double(audio.count) / 16_000)
             Paster.shared.insert(Paster.withTrailingSpace(r.text))
             self.offerCopyIfNoField(r.text, in: front)
         }
     }
 
-    /// Pasting went nowhere (no text field focused): show the text with a «Скопировать» button.
+    /// A list's spoken command word ("Заметка …" for Notes, "Задача …" for Tasks, etc.): the text goes to that list instead of the frontmost app.
+    private func saveToList(_ list: VoiceList, _ text: String, lang: String) {
+        guard !text.isEmpty else { NSSound.beep(); return }
+        VoiceLists.shared.addItem(to: list.id, text: text, lang: lang)
+        NSLog("JustTellMe: saved to a voice list, %d chars", text.count)
+        if Prefs.sounds { NSSound(named: "Glass")?.play() }
+        savedCard.onOpen = { [weak self] in self?.main.openList(list.id) }
+        savedCard.show(text, title: tr("Saved to “\(list.name)”", "Сохранено в «\(list.name)»"), button: tr("Open “\(list.name)”", "Открыть «\(list.name)»"))
+    }
+
+    /// Pasting went nowhere (no text field focused): show the text with a Copy button.
     private func offerCopyIfNoField(_ text: String, in app: NSRunningApplication?) {
         DispatchQueue.global(qos: .userInitiated).async {
             let f = FocusedField.current(in: app)
@@ -409,17 +424,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateStatusLine() {
         var t: String
         switch state {
-        case .loading: t = "Загрузка модели…"
-        case .idle: t = "Готово — удерживайте \(hotkey.key.short)"
-        case .recording: t = "● Запись…"
-        case .transcribing: t = "Распознавание…"
-        case .error(let e): t = "Ошибка: \(e)"
+        case .loading: t = tr("Loading model…", "Загрузка модели…")
+        case .idle: t = tr("Ready — hold \(hotkey.key.short)", "Готово — удерживайте \(hotkey.key.short)")
+        case .recording: t = tr("● Recording…", "● Запись…")
+        case .transcribing: t = tr("Transcribing…", "Распознавание…")
+        case .error(let e): t = tr("Error: \(e)", "Ошибка: \(e)")
         }
-        if !(hotkey.isInstalled && AXIsProcessTrusted()) { t += " (нет Accessibility)" }
+        if !(hotkey.isInstalled && AXIsProcessTrusted()) { t += tr(" (no Accessibility)", " (нет Accessibility)") }
         statusLine.title = "JustTellMe — " + t
         lastLine.isHidden = lastResult.isEmpty
         let short = lastResult.count > 50 ? String(lastResult.prefix(50)) + "…" : lastResult
-        lastLine.title = "Последнее: «\(short)»"
+        lastLine.title = tr("Last: “\(short)”", "Последнее: «\(short)»")
         fixItem.isEnabled = !lastResult.isEmpty
     }
 
@@ -436,7 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         secureItem.isHidden = true
         menu.addItem(secureItem)
         for it in [accessItem, micItem] { it.target = self; menu.addItem(it) }
-        let openItem = NSMenuItem(title: "Открыть JustTellMe…", action: #selector(showMain), keyEquivalent: "o")
+        let openItem = NSMenuItem(title: tr("Open JustTellMe…", "Открыть JustTellMe…"), action: #selector(showMain), keyEquivalent: "o")
         openItem.target = self
         menu.addItem(openItem)
         updateItem.target = self
@@ -444,7 +459,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(updateItem)
         menu.addItem(.separator())
 
-        let keyRoot = NSMenuItem(title: "Клавиша диктовки", action: nil, keyEquivalent: "")
+        let keyRoot = NSMenuItem(title: tr("Dictation Key", "Клавиша диктовки"), action: nil, keyEquivalent: "")
         let keySub = NSMenu()
         for k in PushToTalkHotkey.Key.allCases {
             let it = NSMenuItem(title: k.title, action: #selector(pickHotkey(_:)), keyEquivalent: "")
@@ -456,9 +471,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keyRoot.submenu = keySub
         menu.addItem(keyRoot)
 
-        let langRoot = NSMenuItem(title: "Язык", action: nil, keyEquivalent: "")
+        let langRoot = NSMenuItem(title: tr("Language", "Язык"), action: nil, keyEquivalent: "")
         let sub = NSMenu()
-        for (code, title) in [("auto", "Авто (ru/en, с уклоном в ru)"), ("ru", "Русский"), ("en", "English")] {
+        for (code, title) in [("auto", tr("Auto (ru/en, leaning toward ru)", "Авто (ru/en, с уклоном в ru)")), ("ru", tr("Russian", "Русский")), ("en", "English")] {
             let it = NSMenuItem(title: title, action: #selector(pickLanguage(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = code
@@ -475,21 +490,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(settingsRoot)
 
         menu.addItem(.separator())
-        let vocab = NSMenuItem(title: "Словарь и замены…", action: #selector(openVocabulary), keyEquivalent: "")
+        let vocab = NSMenuItem(title: tr("Dictionary and Replacements…", "Словарь и замены…"), action: #selector(openVocabulary), keyEquivalent: "")
         vocab.target = self
         menu.addItem(vocab)
         builtinItem.target = self
         menu.addItem(builtinItem)
         fixItem.target = self
         menu.addItem(fixItem)
-        let repaste = NSMenuItem(title: "Вставить последнее ещё раз", action: #selector(pasteLastAgain), keyEquivalent: "v")
+        let repaste = NSMenuItem(title: tr("Paste Last Again", "Вставить последнее ещё раз"), action: #selector(pasteLastAgain), keyEquivalent: "v")
         repaste.keyEquivalentModifierMask = [.control, .option]
         repaste.target = self
         menu.addItem(repaste)
-        let copyLast = NSMenuItem(title: "Скопировать последний текст", action: #selector(copyLast), keyEquivalent: "")
+        let copyLast = NSMenuItem(title: tr("Copy Last Text", "Скопировать последний текст"), action: #selector(copyLast), keyEquivalent: "")
         copyLast.target = self
         menu.addItem(copyLast)
-        let stats = NSMenuItem(title: "Статистика…", action: #selector(openStats), keyEquivalent: "")
+        let stats = NSMenuItem(title: tr("Statistics…", "Статистика…"), action: #selector(openStats), keyEquivalent: "")
         stats.target = self
         menu.addItem(stats)
         historyRoot.submenu = NSMenu()
@@ -498,10 +513,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         loginItem.target = self
         menu.addItem(loginItem)
-        let checkItem = NSMenuItem(title: "Проверить обновления…", action: #selector(checkForUpdatesNow), keyEquivalent: "")
+        let checkItem = NSMenuItem(title: tr("Check for Updates…", "Проверить обновления…"), action: #selector(checkForUpdatesNow), keyEquivalent: "")
         checkItem.target = self
         menu.addItem(checkItem)
-        menu.addItem(NSMenuItem(title: "Выход", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: tr("Quit JustTellMe", "Выход"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
         refreshPermissionItems()
     }
@@ -513,7 +528,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let active = ModelManager.active()
         let loadedPath = transcriber.loadedURL?.path
         for info in ModelManager.available() {
-            let title = "\(info.name)  (\(info.sizeMB) МБ\(info.bundled ? ", встроенная" : ""))"
+            let title = "\(info.name)  (\(info.sizeMB) \(tr("MB", "МБ"))\(info.bundled ? tr(", built-in", ", встроенная") : ""))"
             let it = NSMenuItem(title: title, action: #selector(pickModel(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = info.url.path
@@ -521,11 +536,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             m.addItem(it)
         }
         m.addItem(.separator())
-        let add = NSMenuItem(title: "Добавить модель из файла…", action: #selector(addModelFromFile), keyEquivalent: "")
+        let add = NSMenuItem(title: tr("Add Model from File…", "Добавить модель из файла…"), action: #selector(addModelFromFile), keyEquivalent: "")
         add.target = self
         m.addItem(add)
 
-        let dlRoot = NSMenuItem(title: "Скачать модель…", action: nil, keyEquivalent: "")
+        let dlRoot = NSMenuItem(title: tr("Download Model…", "Скачать модель…"), action: nil, keyEquivalent: "")
         let dl = NSMenu(); dl.autoenablesItems = false
         let have = Set(ModelManager.available().map { $0.url.lastPathComponent })
         for c in ModelManager.curated {
@@ -536,7 +551,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dl.addItem(it)
         }
         dl.addItem(.separator())
-        let src = NSMenuItem(title: "Все модели на huggingface.co/ggerganov/whisper.cpp…", action: #selector(openHF), keyEquivalent: "")
+        let src = NSMenuItem(title: tr("All Models on huggingface.co/ggerganov/whisper.cpp…", "Все модели на huggingface.co/ggerganov/whisper.cpp…"), action: #selector(openHF), keyEquivalent: "")
         src.target = self
         dl.addItem(src)
         dlRoot.submenu = dl
@@ -547,15 +562,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let p = NSMenuItem(title: "⬇︎ \(file): \(pct)%", action: nil, keyEquivalent: "")
             p.isEnabled = false
             m.addItem(p)
-            let cancel = NSMenuItem(title: "Отменить загрузку", action: #selector(cancelDownload), keyEquivalent: "")
+            let cancel = NSMenuItem(title: tr("Cancel Download", "Отменить загрузку"), action: #selector(cancelDownload), keyEquivalent: "")
             cancel.target = self
             m.addItem(cancel)
-            modelRoot.title = "Модель (загрузка \(pct)%)"
+            modelRoot.title = tr("Model (Downloading \(pct)%)", "Модель (загрузка \(pct)%)")
         } else {
-            modelRoot.title = "Модель: " + (transcriber.loadedURL.map { ModelInfo(url: $0, bundled: false).name } ?? "—") + (transcriber.usesNeuralEngine ? " · Neural Engine" : "")
+            modelRoot.title = tr("Model: ", "Модель: ") + (transcriber.loadedURL.map { ModelInfo(url: $0, bundled: false).name } ?? "—") + (transcriber.usesNeuralEngine ? " · Neural Engine" : "")
         }
         m.addItem(.separator())
-        let folder = NSMenuItem(title: "Открыть папку моделей", action: #selector(openModelsFolder), keyEquivalent: "")
+        let folder = NSMenuItem(title: tr("Open Models Folder", "Открыть папку моделей"), action: #selector(openModelsFolder), keyEquivalent: "")
         folder.target = self
         m.addItem(folder)
     }
@@ -565,17 +580,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (k, it) in keyItems { it.state = k == hotkey.key ? .on : .off }
         let st = SMAppService.mainApp.status
         loginItem.state = st == .enabled ? .on : .off
-        loginItem.title = st == .requiresApproval ? "Запускать при входе (нужно одобрить)" : "Запускать при входе"
+        loginItem.title = st == .requiresApproval ? tr("Open at Login (Needs Approval)", "Запускать при входе (нужно одобрить)") : tr("Open at Login", "Запускать при входе")
         builtinItem.state = Vocabulary.shared.builtinEnabled ? .on : .off
         rebuildSettingsMenu()
-        if let who = SecureInput.isOn ? (SecureInput.holder() ?? "другое приложение") : nil {
-            secureItem.title = "⚠︎ Защищённый ввод включён (\(who)) — Esc не отменит запись"
-            secureItem.toolTip = "Так macOS защищает поле пароля или «Защищённый ввод с клавиатуры» в Терминале. Диктовка работает, но нажатия клавиш до JustTellMe не доходят."
+        if let who = SecureInput.isOn ? (SecureInput.holder() ?? tr("another app", "другое приложение")) : nil {
+            secureItem.title = tr("⚠︎ Secure Input Is On (\(who)) — Esc Won't Cancel Recording", "⚠︎ Защищённый ввод включён (\(who)) — Esc не отменит запись")
+            secureItem.toolTip = tr("macOS does this to protect a password field or Terminal's Secure Keyboard Entry. Dictation still works, but key presses don't reach JustTellMe.", "Так macOS защищает поле пароля или «Защищённый ввод с клавиатуры» в Терминале. Диктовка работает, но нажатия клавиш до JustTellMe не доходят.")
             secureItem.isHidden = false
         } else {
             secureItem.isHidden = true
         }
-        builtinItem.title = "Встроенный словарь ru/en (\(Vocabulary.shared.builtinTerms.count) слов)"
+        let termCount = Vocabulary.shared.builtinTerms.count
+        let words = L10n.plural(termCount, en: ("word", "words"), ru: ("слово", "слова", "слов"))
+        builtinItem.title = tr("Built-in ru/en Dictionary (\(termCount) \(words))", "Встроенный словарь ru/en (\(termCount) \(words))")
         rebuildModelMenu()
         rebuildHistoryMenu()
         refreshPermissionItems()
@@ -587,11 +604,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.autoenablesItems = false
         let recent = History.shared.entries.prefix(10)
         if recent.isEmpty {
-            let empty = NSMenuItem(title: "Пока пусто", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: tr("Nothing Yet", "Пока пусто"), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             m.addItem(empty)
         } else {
-            let hint = NSMenuItem(title: "Клик — скопировать", action: nil, keyEquivalent: "")
+            let hint = NSMenuItem(title: tr("Click to Copy", "Клик — скопировать"), action: nil, keyEquivalent: "")
             hint.isEnabled = false
             m.addItem(hint)
             for e in recent {
@@ -604,7 +621,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         m.addItem(.separator())
-        let all = NSMenuItem(title: "Вся история… (\(History.shared.entries.count))", action: #selector(openHistory), keyEquivalent: "")
+        let all = NSMenuItem(title: tr("All History… (\(History.shared.entries.count))", "Вся история… (\(History.shared.entries.count))"), action: #selector(openHistory), keyEquivalent: "")
         all.target = self
         m.addItem(all)
     }
@@ -637,24 +654,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         func header(_ t: String) { let h = NSMenuItem(title: t, action: nil, keyEquivalent: ""); h.isEnabled = false; m.addItem(h) }
 
-        _ = item("Все настройки…", #selector(openSettings), on: false)
+        _ = item(tr("All Settings…", "Все настройки…"), #selector(openSettings), on: false)
         m.addItem(.separator())
-        header("Клавиша \(hotkey.key.short)")
+        header(tr("Key: \(hotkey.key.short)", "Клавиша \(hotkey.key.short)"))
         for t in Prefs.Trigger.allCases { _ = item(t.title, #selector(pickTrigger(_:)), on: Prefs.trigger == t, t.rawValue) }
-        header("Esc — отменить запись или распознавание")
+        header(tr("Esc cancels recording or transcription", "Esc — отменить запись или распознавание"))
         m.addItem(.separator())
-        _ = item("Звуки начала и конца записи", #selector(toggleSounds), on: Prefs.sounds)
-        _ = item("Приглушать звук компьютера во время диктовки", #selector(toggleMute), on: Prefs.muteWhileRecording)
-        let clip = item("Возвращать прежний буфер обмена после вставки", #selector(toggleClipboard), on: Prefs.restoreClipboard)
-        clip.toolTip = "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена."
+        _ = item(tr("Recording Start and End Sounds", "Звуки начала и конца записи"), #selector(toggleSounds), on: Prefs.sounds)
+        _ = item(tr("Mute Computer Audio While Dictating", "Приглушать звук компьютера во время диктовки"), #selector(toggleMute), on: Prefs.muteWhileRecording)
+        let clip = item(tr("Restore Previous Clipboard After Pasting", "Возвращать прежний буфер обмена после вставки"), #selector(toggleClipboard), on: Prefs.restoreClipboard)
+        clip.toolTip = tr("If turned off, the dictated text stays on the clipboard. Clipboard managers (Maccy, Raycast, Paste) don't save dictated text while this option is on.", "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена.")
         m.addItem(.separator())
 
-        let micRoot = NSMenuItem(title: "Микрофон", action: nil, keyEquivalent: "")
+        let micRoot = NSMenuItem(title: tr("Microphone", "Микрофон"), action: nil, keyEquivalent: "")
         let mics = NSMenu(); mics.autoenablesItems = false
         let sysName = AudioDevices.defaultDevice(input: true).flatMap(AudioDevices.name(of:)) ?? "—"
         let devices = AudioDevices.inputs()
         let current = Prefs.micUID.flatMap { uid in devices.contains { $0.uid == uid } ? uid : nil }
-        let sys = NSMenuItem(title: "Как в системе (\(sysName))", action: #selector(pickMic(_:)), keyEquivalent: "")
+        let sys = NSMenuItem(title: tr("System Default (\(sysName))", "Как в системе (\(sysName))"), action: #selector(pickMic(_:)), keyEquivalent: "")
         sys.target = self
         sys.state = current == nil ? .on : .off
         mics.addItem(sys)
@@ -667,7 +684,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             mics.addItem(it)
         }
         if let uid = Prefs.micUID, current == nil {
-            let gone = NSMenuItem(title: "Выбранный микрофон не подключён — используется системный", action: nil, keyEquivalent: "")
+            let gone = NSMenuItem(title: tr("Selected Microphone Not Connected — Using System Default", "Выбранный микрофон не подключён — используется системный"), action: nil, keyEquivalent: "")
             gone.isEnabled = false
             gone.toolTip = uid
             mics.addItem(.separator())
@@ -678,12 +695,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         m.addItem(.separator())
         let ne = item(neuralTitle, #selector(toggleNeural), on: Prefs.neuralEngine)
-        ne.toolTip = "Тяжёлая часть Whisper считается на Neural Engine — примерно в 5 раз быстрее на M1 и не зависит от загрузки видеокарты другими приложениями. Нужно скачать 1,2 ГБ; затем macOS один раз готовит модель (до ~30 минут), пока диктовка работает как обычно."
+        ne.toolTip = tr("The heavy part of Whisper runs on the Neural Engine: about 5 times faster on M1, and unaffected by other apps using the GPU. Requires a 1.2 GB download; then macOS prepares the model once (up to ~30 minutes) while dictation keeps working as usual.", "Тяжёлая часть Whisper считается на Neural Engine — примерно в 5 раз быстрее на M1 и не зависит от загрузки видеокарты другими приложениями. Нужно скачать 1,2 ГБ; затем macOS один раз готовит модель (до ~30 минут), пока диктовка работает как обычно.")
         if case .failed = neural.status {
-            let retry = item("Повторить подготовку Neural Engine", #selector(retryNeural), on: false)
+            let retry = item(tr("Retry Neural Engine Preparation", "Повторить подготовку Neural Engine"), #selector(retryNeural), on: false)
             retry.indentationLevel = 1
         }
-        let unloadRoot = NSMenuItem(title: "Выгружать модель из памяти", action: nil, keyEquivalent: "")
+        let unloadRoot = NSMenuItem(title: tr("Unload Model from Memory", "Выгружать модель из памяти"), action: nil, keyEquivalent: "")
         let un = NSMenu(); un.autoenablesItems = false
         for (mins, title) in SettingsPane.unloadOptions {
             let it = NSMenuItem(title: title, action: #selector(pickUnload(_:)), keyEquivalent: "")
@@ -692,7 +709,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             it.state = Prefs.unloadAfterMinutes == mins ? .on : .off
             un.addItem(it)
         }
-        let note = NSMenuItem(title: "Модель загружается заново, пока вы говорите", action: nil, keyEquivalent: "")
+        let note = NSMenuItem(title: tr("The model reloads while you speak", "Модель загружается заново, пока вы говорите"), action: nil, keyEquivalent: "")
         note.isEnabled = false
         un.addItem(.separator())
         un.addItem(note)
@@ -702,24 +719,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     var neuralStatusText: String {
         switch neural.status {
-        case .off: return "Включено, запускается…"
-        case .downloading(let p): return "Скачивание \(Int(p * 100))% из 1,2 ГБ — диктовка пока работает как обычно."
-        case .unpacking: return "Распаковка…"
-        case .preparing: return "macOS готовит модель для Neural Engine (один раз, до ~30 минут). Диктовка пока работает как обычно."
-        case .ready: return transcriber.usesNeuralEngine ? "Работает." : "Подключается…"
-        case .failed(let e): return "Ошибка: \(e)"
+        case .off: return tr("On, starting…", "Включено, запускается…")
+        case .downloading(let p): return tr("Downloading \(Int(p * 100))% of 1.2 GB. Dictation works as usual in the meantime.", "Скачивание \(Int(p * 100))% из 1,2 ГБ — диктовка пока работает как обычно.")
+        case .unpacking: return tr("Unpacking…", "Распаковка…")
+        case .preparing: return tr("macOS is preparing the model for the Neural Engine (once, up to ~30 minutes). Dictation works as usual in the meantime.", "macOS готовит модель для Neural Engine (один раз, до ~30 минут). Диктовка пока работает как обычно.")
+        case .ready: return transcriber.usesNeuralEngine ? tr("Running.", "Работает.") : tr("Connecting…", "Подключается…")
+        case .failed(let e): return tr("Error: \(e)", "Ошибка: \(e)")
         }
     }
 
     private var neuralTitle: String {
-        guard Prefs.neuralEngine else { return "Ускорение Neural Engine (скачать 1,2 ГБ)…" }
+        guard Prefs.neuralEngine else { return tr("Neural Engine Acceleration (1.2 GB Download)…", "Ускорение Neural Engine (скачать 1,2 ГБ)…") }
         switch neural.status {
-        case .off: return "Ускорение Neural Engine"
-        case .downloading(let p): return "Neural Engine: скачивание \(Int(p * 100))%"
-        case .unpacking: return "Neural Engine: распаковка…"
-        case .preparing: return "Neural Engine: macOS готовит модель (один раз, до ~30 мин)…"
-        case .ready: return transcriber.usesNeuralEngine ? "Ускорение Neural Engine — работает" : "Ускорение Neural Engine — подключается…"
-        case .failed(let e): return "Neural Engine: ошибка — \(e)"
+        case .off: return tr("Neural Engine Acceleration", "Ускорение Neural Engine")
+        case .downloading(let p): return tr("Neural Engine: Downloading \(Int(p * 100))%", "Neural Engine: скачивание \(Int(p * 100))%")
+        case .unpacking: return tr("Neural Engine: Unpacking…", "Neural Engine: распаковка…")
+        case .preparing: return tr("Neural Engine: macOS Is Preparing the Model (Once, up to ~30 min)…", "Neural Engine: macOS готовит модель (один раз, до ~30 мин)…")
+        case .ready: return transcriber.usesNeuralEngine ? tr("Neural Engine Acceleration — Running", "Ускорение Neural Engine — работает") : tr("Neural Engine Acceleration — Connecting…", "Ускорение Neural Engine — подключается…")
+        case .failed(let e): return tr("Neural Engine: Error — \(e)", "Neural Engine: ошибка — \(e)")
         }
     }
 
@@ -729,10 +746,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else {
             NSApp.activate(ignoringOtherApps: true)
             let a = NSAlert()
-            a.messageText = "Включить ускорение Neural Engine?"
-            a.informativeText = "JustTellMe скачает версию модели для Neural Engine (1,2 ГБ). Потом macOS один раз подготовит её — на M1 это до 30 минут с полной загрузкой процессора. Всё это время диктовка работает как обычно, а потом станет примерно в 5 раз быстрее.\n\nПосле обновления JustTellMe подготовка может повториться."
-            a.addButton(withTitle: "Включить")
-            a.addButton(withTitle: "Отмена")
+            a.messageText = tr("Turn on Neural Engine acceleration?", "Включить ускорение Neural Engine?")
+            a.informativeText = tr("JustTellMe will download a Neural Engine version of the model (1.2 GB). macOS then prepares it once: on M1 this takes up to 30 minutes at full CPU load. Dictation works as usual the whole time, and afterwards becomes about 5 times faster.\n\nPreparation may run again after JustTellMe updates.", "JustTellMe скачает версию модели для Neural Engine (1,2 ГБ). Потом macOS один раз подготовит её — на M1 это до 30 минут с полной загрузкой процессора. Всё это время диктовка работает как обычно, а потом станет примерно в 5 раз быстрее.\n\nПосле обновления JustTellMe подготовка может повториться.")
+            a.addButton(withTitle: tr("Turn On", "Включить"))
+            a.addButton(withTitle: tr("Cancel", "Отмена"))
             guard a.runModal() == .alertFirstButtonReturn else { return }
             Prefs.neuralEngine = true
         }
@@ -790,7 +807,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func addModelFromFile() {
         NSApp.activate(ignoringOtherApps: true)
         let p = NSOpenPanel()
-        p.title = "Выберите модель whisper.cpp (ggml-*.bin)"
+        p.title = tr("Choose a whisper.cpp Model (ggml-*.bin)", "Выберите модель whisper.cpp (ggml-*.bin)")
         p.allowedContentTypes = []
         p.allowsOtherFileTypes = true
         p.canChooseDirectories = false
@@ -819,17 +836,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if (err as NSError).code == NSURLErrorCancelled { return }
             NSApp.activate(ignoringOtherApps: true)
             let a = NSAlert()
-            a.messageText = "Не удалось скачать \(file)"
+            a.messageText = tr("Couldn't download \(file)", "Не удалось скачать \(file)")
             a.informativeText = err.localizedDescription
             a.runModal()
             return
         }
         NSApp.activate(ignoringOtherApps: true)
         let a = NSAlert()
-        a.messageText = "Модель \(file) скачана"
-        a.informativeText = "Переключиться на неё сейчас?"
-        a.addButton(withTitle: "Переключиться")
-        a.addButton(withTitle: "Позже")
+        a.messageText = tr("Model \(file) downloaded", "Модель \(file) скачана")
+        a.informativeText = tr("Switch to it now?", "Переключиться на неё сейчас?")
+        a.addButton(withTitle: tr("Switch", "Переключиться"))
+        a.addButton(withTitle: tr("Later", "Позже"))
         if a.runModal() == .alertFirstButtonReturn,
            let info = ModelManager.available().first(where: { $0.url.lastPathComponent == file }) {
             ModelManager.setActive(info)
@@ -869,15 +886,15 @@ extension AppDelegate {
     private func updateChanged() {
         switch updater.state {
         case .available(let r):
-            updateItem.title = "⬆︎ Доступна версия \(r.version) — установить…"
+            updateItem.title = tr("⬆︎ Version \(r.version) Available — Install…", "⬆︎ Доступна версия \(r.version) — установить…")
             updateItem.isHidden = false
             updateItem.isEnabled = true
         case .downloading(let r, let p):
-            updateItem.title = "⬇︎ Загрузка версии \(r.version): \(Int(p * 100))%"
+            updateItem.title = tr("⬇︎ Downloading Version \(r.version): \(Int(p * 100))%", "⬇︎ Загрузка версии \(r.version): \(Int(p * 100))%")
             updateItem.isHidden = false
             updateItem.isEnabled = false
         case .installing:
-            updateItem.title = "Установка обновления…"
+            updateItem.title = tr("Installing Update…", "Установка обновления…")
             updateItem.isHidden = false
             updateItem.isEnabled = false
         default:
@@ -892,21 +909,24 @@ extension AppDelegate {
         let a = NSAlert()
         a.messageText = "JustTellMe \(r.version)"
         let notes = r.notes.count > 900 ? String(r.notes.prefix(900)) + "…" : r.notes
-        a.informativeText = "Сейчас установлена версия \(Updater.currentVersion).\n\n\(notes)\n\n"
-            + "Загрузка \(r.size > 0 ? "\(r.size / 1_000_000) МБ" : "архива"), затем JustTellMe перезапустится. Разрешения сохранятся."
-        a.addButton(withTitle: "Установить и перезапустить")
-        a.addButton(withTitle: "Позже")
-        a.addButton(withTitle: "Что нового на GitHub")
+        let sizeMB = r.size / 1_000_000
+        a.informativeText = tr("Installed version: \(Updater.currentVersion).\n\n\(notes)\n\n", "Сейчас установлена версия \(Updater.currentVersion).\n\n\(notes)\n\n")
+            + (r.size > 0
+               ? tr("JustTellMe will download \(sizeMB) MB, then relaunch. Permissions are kept.", "Загрузка \(sizeMB) МБ, затем JustTellMe перезапустится. Разрешения сохранятся.")
+               : tr("JustTellMe will download the archive, then relaunch. Permissions are kept.", "Загрузка архива, затем JustTellMe перезапустится. Разрешения сохранятся."))
+        a.addButton(withTitle: tr("Install and Relaunch", "Установить и перезапустить"))
+        a.addButton(withTitle: tr("Later", "Позже"))
+        a.addButton(withTitle: tr("What's New on GitHub", "Что нового на GitHub"))
         switch a.runModal() {
         case .alertFirstButtonReturn:
             updater.install(r) { [weak self] err in
                 guard let err, let self else { return }
                 NSApp.activate(ignoringOtherApps: true)
                 let e = NSAlert()
-                e.messageText = "Не удалось установить обновление"
-                e.informativeText = err.localizedDescription + "\n\nМожно скачать его вручную со страницы выпуска."
-                e.addButton(withTitle: "Открыть страницу")
-                e.addButton(withTitle: "Закрыть")
+                e.messageText = tr("Couldn't install the update", "Не удалось установить обновление")
+                e.informativeText = err.localizedDescription + tr("\n\nYou can download it manually from the release page.", "\n\nМожно скачать его вручную со страницы выпуска.")
+                e.addButton(withTitle: tr("Open Page", "Открыть страницу"))
+                e.addButton(withTitle: tr("Close", "Закрыть"))
                 if e.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(r.page) }
                 self.updater.state = .available(r)
             }
@@ -924,10 +944,10 @@ extension AppDelegate {
                 NSApp.activate(ignoringOtherApps: true)
                 let a = NSAlert()
                 if case .failed(let e) = st {
-                    a.messageText = "Не удалось проверить обновления"
+                    a.messageText = tr("Couldn't check for updates", "Не удалось проверить обновления")
                     a.informativeText = e
                 } else {
-                    a.messageText = "Установлена последняя версия"
+                    a.messageText = tr("You're up to date", "Установлена последняя версия")
                     a.informativeText = "JustTellMe \(Updater.currentVersion)"
                 }
                 a.runModal()
@@ -937,14 +957,14 @@ extension AppDelegate {
     }
 
     var updateStatusText: String {
-        let v = "Установлена версия \(Updater.currentVersion)."
+        let v = tr("Installed version: \(Updater.currentVersion).", "Установлена версия \(Updater.currentVersion).")
         switch updater.state {
-        case .checking: return v + " Проверка…"
-        case .upToDate: return v + " Это последняя версия."
-        case .available(let r): return v + " Доступна \(r.version)."
-        case .downloading(let r, let p): return v + " Загрузка \(r.version): \(Int(p * 100))%."
-        case .installing: return v + " Установка…"
-        case .failed(let e): return v + " Не удалось проверить: \(e)"
+        case .checking: return v + tr(" Checking…", " Проверка…")
+        case .upToDate: return v + tr(" This is the latest version.", " Это последняя версия.")
+        case .available(let r): return v + tr(" Version \(r.version) is available.", " Доступна \(r.version).")
+        case .downloading(let r, let p): return v + tr(" Downloading \(r.version): \(Int(p * 100))%.", " Загрузка \(r.version): \(Int(p * 100))%.")
+        case .installing: return v + tr(" Installing…", " Установка…")
+        case .failed(let e): return v + tr(" Couldn't check: \(e)", " Не удалось проверить: \(e)")
         case .idle: return v
         }
     }

@@ -35,7 +35,7 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/jtm-tests.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "==> Running tests"
-JTM_SUPPORT_DIR="$TMP" \
+JTM_SUPPORT_DIR="$TMP" JTM_LANG=ru \
 JTM_RESOURCES="$ROOT/Resources" \
 JTM_APP_BIN="${JTM_APP_BIN:-$ROOT/dist/JustTellMe.app/Contents/MacOS/JustTellMe}" \
   "$BUILD/JustTellMeTests"

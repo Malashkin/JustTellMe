@@ -138,13 +138,15 @@ if let out = opt("--demo-window") {
     app.appearance = NSAppearance(named: .aqua)
     let w = MainWindow()
     w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: false, modelReady: true) }
-    var pages = MainWindow.Page.allCases
+    var pages = w.demoItems
+    var n = 0
     func next() {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
-        w.open(p)
+        w.present(p)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            w.snapshot(to: URL(fileURLWithPath: "\(out)-\(p.rawValue).png"))
+            w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
+            n += 1
             next()
         }
     }
@@ -214,13 +216,27 @@ if args.contains("--focus-check") {
     exit(0)
 }
 
-//   JustTellMe --demo-card out.png   (renders the «Курсор не в поле ввода?» card)
+//   JustTellMe --demo-card out.png   (renders the "No text field?" card)
 if let out = opt("--demo-card") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.appearance = NSAppearance(named: .aqua)
     let c = NoFieldCard()
-    c.show("Созвон перенесли на четверг, в 15:00. Захвати, пожалуйста, ноутбук и отчёт по продажам за октябрь.")
+    c.show(tr("The call moved to Thursday at 3 PM. Please bring the laptop and the October sales report.",
+               "Созвон перенесли на четверг, в 15:00. Захвати, пожалуйста, ноутбук и отчёт по продажам за октябрь."))
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
+    app.run()
+}
+
+//   JustTellMe --demo-note-card out.png   (renders the "Saved to Notes" card)
+if let out = opt("--demo-note-card") {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    app.appearance = NSAppearance(named: .aqua)
+    let c = SavedCard()
+    c.show(tr("Buy milk and call the bank about the card before Friday, and pick up the parcel at the post office.",
+              "Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте."),
+           title: tr("Saved to “Notes”", "Сохранено в «Заметки»"), button: tr("Open “Notes”", "Открыть «Заметки»"))
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
     app.run()
 }

@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-12
+updated: 2026-11-24
 ---
 
 # Overview
@@ -25,16 +25,19 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Vocabulary.swift` | Prompt, personal and built-in dictionary, replacement rules, casing of Latin terms |
 | `Learning.swift` | `CorrectionLearner` (word diff → rules + terms); `Paths` (data folder) |
 | `Paster.swift` | Clipboard round trip: lazy pasteboard promise, ⌘V, restore after the target app reads it; paste-again waits for ⌃⌥ to be released |
-| `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with «Скопировать» |
+| `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with a Copy button |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
-| `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
+| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page), `ListEditor` (New List / Edit List…) |
+| `VoiceCommands.swift` | `SpokenKeyword` (a command word at the start, one letter off, split in two, lookalikes), `SavedCard` (“Saved to “…””) |
+| `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Statistics page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
-| `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
-| `Windows.swift` | `VocabularyPane` (Словарь page), `CorrectionWindow` (fix and remember) |
+| `SettingsPane.swift` | Settings page; `SettingsHost` protocol implemented by `AppDelegate` |
+| `Windows.swift` | `VocabularyPane` (Dictionary page), `CorrectionWindow` (fix and remember), `SelectableTextTableView` (text in the feed and notes can be selected with the mouse; ⌘C copies highlighted rows) |
 | `Overlay.swift` | The recording pill; `WaveView` draws 18 CALayer bars at 30 fps |
 | `Settings.swift` | `Prefs`, CoreAudio helpers, `SystemMute`, `SecureInput` |
 | `Models.swift` | Bundled, imported and downloaded models; the active model |
+| `L10n.swift` | Interface language: `tr("English", "Русский")` pairs, `L10n.isRussian` (system language or `JTM_LANG`), `L10n.plural`, `L10n.formatter` ([ADR 011](decisions/011-interface-follows-system-language.md)) |
 
 ## Dictation pipeline
 
@@ -60,12 +63,17 @@ sequenceDiagram
     S->>W: transcribe remainder
     W-->>S: text (cleanup, replacements, casing)
     S-->>A: joined text + language
-    A->>A: History.add
-    A->>P: insert (clipboard promise + ⌘V, restore after read)
-    A-->>A: FocusedField (background): no text field → NoFieldCard
+    alt text starts with a voice list's command word (“Note”, “Task”, … or «Заметка», «Задача» in Russian)
+        A->>A: VoiceLists.addItem (rest of the phrase) → SavedCard, nothing pasted
+    else
+        A->>A: History.add
+        A->>P: insert (clipboard promise + ⌘V, restore after read)
+        A-->>A: FocusedField (background): no text field → NoFieldCard
+    end
 ```
 
 Notes:
+- A result whose first word is a voice list's command word goes to that list, not to the frontmost app or `History` ([ADR 009](decisions/009-voice-notes-by-keyword.md), [ADR 010](decisions/010-configurable-voice-lists.md)).
 - Pieces run one at a time on the transcriber's serial queue. The language and prompt for a piece are decided on
   that queue, so they always see the previous piece's result. A piece that follows an English piece is decoded as English.
 - `auto` decodes as Russian, with no separate detection pass. The language label comes from the script, counting words.
@@ -80,11 +88,14 @@ Notes:
 ```mermaid
 flowchart LR
     MW[MainWindow<br/>sidebar] --> H[HomePane<br/>status · quick stats · feed]
+    MW --> N[ListPane per list<br/>by day · search · ticks · tasks: status, deadline, filters]
+    MW --> LE[ListEditor<br/>new list · words · kind · delete]
     MW --> ST[StatsPane]
     MW --> V[VocabularyPane]
     MW --> SE[SettingsPane]
     SE -- SettingsHost --> AD[AppDelegate]
     HI[(History)] -- onChange --> MW
+    NO[(VoiceLists)] -- onChange --> MW
     AD -- appStatus --> H
 ```
 
@@ -97,8 +108,8 @@ sequenceDiagram
     participant D as GitHub Releases
     U->>G: GET /repos/Malashkin/JustTellMe/releases/latest (daily)
     G-->>U: tag, notes, JustTellMe.zip URL
-    U->>U: newer than CFBundleShortVersionString? → menu + Главная
-    U->>D: download JustTellMe.zip (after «Установить»)
+    U->>U: newer than CFBundleShortVersionString? → menu + Home
+    U->>D: download JustTellMe.zip (after “Install…”)
     U->>U: ditto -x; same bundle id, same version as tag; codesign --verify; same certificate (designated requirement)
     U->>U: sh: wait for exit → swap the .app (roll back on failure) → open
 ```
@@ -107,6 +118,6 @@ See [ADR 007](decisions/007-updates-from-github-releases.md).
 
 ## Data on disk
 
-`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `dictionary.txt`,
+`~/Library/Application Support/JustTellMe/` (or `$JTM_SUPPORT_DIR`): `history.json`, `lists.json`, `list-<id>.json`, `dictionary.txt`,
 `replacements.txt`, `prompt.txt` (only when customised), `Models/` (downloaded models and Core ML encoders).
 See [security/](../security/index.md).

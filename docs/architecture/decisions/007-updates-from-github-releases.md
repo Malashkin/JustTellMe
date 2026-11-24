@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-24
 ---
 
 # 007. Updates from GitHub Releases, installed by the app
@@ -10,7 +10,7 @@ updated: 2026-11-11
 
 ## Context
 New versions were copied to other Macs by hand as `dist/JustTellMe.zip`. The repository is public now. The app is
-signed with a self-signed certificate («JustTellMe Local Signing»), not notarized. Sparkle would add a framework, an
+signed with a self-signed certificate (“JustTellMe Local Signing”), not notarized. Sparkle would add a framework, an
 EdDSA key and an appcast for a single-maintainer app.
 
 ## Decision

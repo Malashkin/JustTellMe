@@ -1,9 +1,9 @@
 # Test Results
 
-**Date:** 2026-11-12 (v1.2.0) · **Status:** 🟢 PASS
+**Date:** 2026-11-24 (v1.2.0 + voice lists + English interface, branch `feat/voice-notes`) · **Status:** 🟢 PASS
 **Stack:** Swift 5.10 + C shim (whisper.cpp), macOS desktop app, Command Line Tools only (no XCTest)
 **Runner:** `scripts/test.sh` (a test executable built from `Sources/App` + `Tests/`; `JTM_SKIP_SLOW=1` skips speech recognition)
-**Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched.
+**Isolation:** every run uses a fresh temporary `JTM_SUPPORT_DIR`, so real history, dictionary and models are never touched. **Language:** the suite runs with the Russian interface (`JTM_LANG=ru`); `LocalizationTests` switch to English.
 
 | Layer | Tests | Result | Covers |
 |---|---|---|---|
@@ -11,9 +11,11 @@
 | Integration (files) | 10 (incl. 1 property-based) | ✅ | history save/delete/clear and JSON round trip, personal dictionary and replacements end to end, save/load from the dictionary page, built-in dictionary (no client names, all rules valid) |
 | Unit, v1.1–1.2 features | 25 (incl. 5 property-based) | ✅ | double tap → hands-free by default, single-tap and hold-only modes, any press ≥ 0.3 s is push-to-talk, unload default and explicit «никогда», trailing space for ⌃⌥V, «is a text field focused» (text/none/unknown, Chrome/Electron never «none», AX errors), version order, GitHub release parsing (drafts, missing zip, garbage), version from the `releases/latest` redirect, waveform bars |
 | Integration (app binary) | 10 | ✅ | `--learn`, `--list-models`, Russian speech with English terms (TTS), long dictation streamed in pieces (2 pieces early, **ready 0.83 s after release**, GPU), **reload after idle unload 0.22 s** with the same text, the idle timer frees the model even if it was used after being armed, update archives: this build accepted; wrong version, modified after signing, other certificate, other app refused; a release zip installed over another copy (no hang, no leftovers) |
+| Unit + files, voice lists and text selection | 21 | ✅ | command words of Заметки/Задачи («Заметка», «Задача» only as the first whole word, keyword removed, alone → empty), misheard one letter off or split in two («Замевка», «За мефка», «Зодача», «За дача»), lookalikes pasted («Заметна», «Заметкам», «Зачётка», «Задачам», «Удача»…); own lists with several words, short words exact, exact beats a near miss; typed words parsed and checked (empty, multi-word, taken by another list); first run creates Заметки and Задачи and moves `notes.json` once; create/rename/change words and kind/delete a list with its file; entries newest first, reload, search, exact delete; task Done remembers when, Backlog forgets, deadline is a day; filters by status, created/due/done over today/7/30 days/custom range, overdue Backlog in due periods, notes ignore task filters; day groups by the chosen date, deadlines soonest first, undated last; the line under a task (deadline, overdue, done); dated headers incl. «Завтра»; ticks and bulk actions; selectable text and ⌘C; sidebar order |
+| Unit, interface language | 4 | ✅ | English texts, plurals and date formats («Today, November 23», «Nov 23, 09:05»), English default lists Notes/Tasks opened by exact «Note»/«Task», switching to Russian changes texts, dates and default lists |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 96 passed, 0 failed, 0 skipped, 170 s (fast suite: 86 passed, 10 s).
+**Total:** 120 passed, 0 failed, 1 skipped (update archive signed by another certificate: this local build is ad-hoc signed, so there is nothing to compare), 70 s (fast suite: 110 passed, 4 s). Stream: ready 0.57 s after release; reload after idle 0.21 s.
 
 ## Mutation testing
 

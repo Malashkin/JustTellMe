@@ -12,37 +12,62 @@ struct AppStatus: Equatable {
     var update: String?
 }
 
-/// The app's only window: a sidebar with Главная (feed + quick stats), Статистика, Словарь, Настройки.
+/// The app's only window: a sidebar with Home (feed + quick stats), the voice lists (Notes, Tasks and any
+/// the user creates), "New List", Statistics, Dictionary, Settings.
 /// Opened from the menu-bar icon or by launching the app again from Finder/Launchpad/Dock.
 final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     enum Page: Int, CaseIterable {
         case home, stats, vocabulary, settings
-        var title: String { ["Главная", "Статистика", "Словарь", "Настройки"][rawValue] }
+        var title: String {
+            [tr("Home", "Главная"), tr("Statistics", "Статистика"), tr("Dictionary", "Словарь"), tr("Settings", "Настройки")][rawValue]
+        }
         var symbol: String { ["house", "chart.bar.xaxis", "character.book.closed", "gearshape"][rawValue] }
+    }
+
+    /// One row of the sidebar.
+    enum Item: Equatable {
+        case page(Page), list(UUID), addList
+    }
+
+    /// Home, then the lists in their order, "New List", then the fixed pages.
+    static func sidebarItems(_ lists: [VoiceList]) -> [Item] {
+        [.page(.home)] + lists.map { .list($0.id) } + [.addList, .page(.stats), .page(.vocabulary), .page(.settings)]
     }
 
     let home = HomePane()
     let stats = StatsPane()
     let vocabulary = VocabularyPane()
     let settings = SettingsPane()
+    private var listPanes: [UUID: ListPane] = [:]
 
     private var window: NSWindow?
     private let sidebar = NSTableView()
     private let content = NSView()
     private var timer: Timer?
-    private(set) var page: Page = .home
+    private var items: [Item] = []
+    private(set) var current: Item = .page(.home)
+    var page: Page? { if case .page(let p) = current { return p } else { return nil } }
 
     var isVisible: Bool { window?.isVisible ?? false }
 
     override init() {
         super.init()
+        items = Self.sidebarItems(VoiceLists.shared.lists)
         home.onOpenStats = { [weak self] in self?.open(.stats) }
         History.shared.onChange = { [weak self] in self?.historyChanged() }
+        VoiceLists.shared.onChange = { [weak self] id in self?.listsChanged(id) }
     }
 
-    func open(_ p: Page? = nil) {
+    func open(_ p: Page? = nil) { present(p.map { .page($0) } ?? current) }
+
+    func openList(_ id: UUID) { present(.list(id)) }
+
+    /// Every row except "New List", for --demo-window.
+    var demoItems: [Item] { items.filter { $0 != .addList } }
+
+    func present(_ item: Item) {
         if window == nil { build() }
-        show(p ?? page)
+        show(item)
         // A Dock icon while the window is open, so it can be found with ⌘Tab like any other app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -73,17 +98,64 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         if page == .stats { stats.reload() }
     }
 
-    private func show(_ p: Page) {
-        page = p
-        if sidebar.selectedRow != p.rawValue { sidebar.selectRowIndexes([p.rawValue], byExtendingSelection: false) }
-        let pane: NSView
-        switch p {
-        case .home: home.reload(); home.refreshStatus(); pane = home.view
-        case .stats: stats.reload(); pane = stats.view
-        case .vocabulary: vocabulary.reload(); pane = vocabulary.view
-        case .settings: settings.reload(); pane = settings.view
+    /// A list's entries changed (id), or the lists themselves (nil: renamed, added, deleted).
+    private func listsChanged(_ id: UUID?) {
+        if id == nil {
+            items = Self.sidebarItems(VoiceLists.shared.lists)
+            listPanes = listPanes.filter { VoiceLists.shared.list($0.key) != nil }
+            sidebar.reloadData()
+            if case .list(let cur) = current, VoiceLists.shared.list(cur) == nil { current = .page(.home) }
+            if isVisible { show(current, force: true) }
+            return
         }
-        guard pane.superview !== content else { return }
+        guard isVisible, current == .list(id!) else { return }
+        listPanes[id!]?.reload()
+    }
+
+    private func pane(for id: UUID) -> ListPane {
+        if let p = listPanes[id] { return p }
+        let p = ListPane(listID: id)
+        p.onConfigure = { [weak self] id in self?.editList(id) }
+        listPanes[id] = p
+        return p
+    }
+
+    /// "New List" (nil) or "Edit List…" of a list.
+    func editList(_ id: UUID?) {
+        switch ListEditor.run(id.flatMap { VoiceLists.shared.list($0) }) {
+        case .saved(let l): openList(l.id)
+        case .deleted: open(.home)
+        case .cancelled: show(current, force: true)
+        }
+    }
+
+    private func show(_ item: Item, force: Bool = false) {
+        guard item != .addList else { return }
+        current = item
+        if let row = items.firstIndex(of: item), sidebar.selectedRow != row {
+            sidebar.selectRowIndexes([row], byExtendingSelection: false)
+        }
+        let pane: NSView
+        var title = "JustTellMe"
+        switch item {
+        case .page(let p):
+            switch p {
+            case .home: home.reload(); home.refreshStatus(); pane = home.view
+            case .stats: stats.reload(); pane = stats.view
+            case .vocabulary: vocabulary.reload(); pane = vocabulary.view
+            case .settings: settings.reload(); pane = settings.view
+            }
+            if p != .home { title = p.title }
+        case .list(let id):
+            let lp = self.pane(for: id)
+            lp.reload()
+            pane = lp.view
+            title = VoiceLists.shared.list(id)?.name ?? title
+        case .addList:
+            return
+        }
+        window?.title = title
+        if pane.superview === content { return }
         content.subviews.forEach { $0.removeFromSuperview() }
         pane.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(pane)
@@ -93,7 +165,6 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             pane.topAnchor.constraint(equalTo: content.safeAreaLayoutGuide.topAnchor),
             pane.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
-        window?.title = p == .home ? "JustTellMe" : p.title
     }
 
     private func build() {
@@ -136,14 +207,25 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
 
     // MARK: sidebar
 
-    func numberOfRows(in tableView: NSTableView) -> Int { Page.allCases.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
 
     func tableView(_ tableView: NSTableView, viewFor col: NSTableColumn?, row: Int) -> NSView? {
-        let p = Page(rawValue: row)!
+        let title: String, symbol: String
+        var dim = false
+        switch items[row] {
+        case .page(let p): title = p.title; symbol = p.symbol
+        case .list(let id):
+            let l = VoiceLists.shared.list(id)
+            title = l?.name ?? "?"
+            symbol = l?.kind == .tasks ? "checklist" : "note.text"
+        case .addList: title = tr("New List", "Новый список"); symbol = "plus"; dim = true
+        }
         let cell = NSTableCellView()
-        let img = NSImageView(image: NSImage(systemSymbolName: p.symbol, accessibilityDescription: p.title) ?? NSImage())
-        let t = NSTextField(labelWithString: p.title)
+        let img = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: title) ?? NSImage())
+        let t = NSTextField(labelWithString: title)
         t.font = .systemFont(ofSize: 13)
+        t.lineBreakMode = .byTruncatingTail
+        if dim { t.textColor = .secondaryLabelColor; img.contentTintColor = .secondaryLabelColor }
         for v in [img, t] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(v) }
         cell.imageView = img
         cell.textField = t
@@ -152,14 +234,24 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             img.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             img.widthAnchor.constraint(equalToConstant: 18),
             t.leadingAnchor.constraint(equalTo: img.trailingAnchor, constant: 8),
+            t.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -4),
             t.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
         ])
         return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard let p = Page(rawValue: sidebar.selectedRow), p != page || content.subviews.isEmpty else { return }
-        show(p)
+        let row = sidebar.selectedRow
+        guard row >= 0, row < items.count else { return }
+        let item = items[row]
+        if item == .addList {
+            // Not a page: keep the current page selected and ask for the new list.
+            DispatchQueue.main.async { self.editList(nil) }
+            if let cur = items.firstIndex(of: current) { sidebar.selectRowIndexes([cur], byExtendingSelection: false) }
+            return
+        }
+        guard item != current || content.subviews.isEmpty else { return }
+        show(item)
     }
 
     /// Render the window content to PNG (used by --demo-window).
@@ -191,17 +283,13 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private let problems = NSStackView()
     private var lastStatus: AppStatus?
     private var cards: [StatCard] = []
-    private let table = NSTableView()
+    private let table = SelectableTextTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
     private var rows: [Row] = []
 
-    private static let timeFmt: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = "HH:mm"; return f
-    }()
-    private static let dayFmt: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = "d MMMM, EEEE"; return f
-    }()
+    private static var timeFmt: DateFormatter { L10n.formatter(en: "HH:mm", ru: "HH:mm") }
+    private static var dayFmt: DateFormatter { L10n.formatter(en: "EEEE, MMMM d", ru: "d MMMM, EEEE") }
 
     private func build() -> NSView {
         hint.textColor = .secondaryLabelColor
@@ -209,16 +297,16 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         problems.alignment = .leading
         problems.spacing = 10
 
-        cards = ["Сегодня", "Скорость", "Серия", "Сэкономлено"].map { StatCard(title: $0) }
-        let more = NSButton(title: "Вся статистика →", target: self, action: #selector(statsAction))
+        cards = [tr("Today", "Сегодня"), tr("Speed", "Скорость"), tr("Streak", "Серия"), tr("Time Saved", "Сэкономлено")].map { StatCard(title: $0) }
+        let more = NSButton(title: tr("All Statistics →", "Вся статистика →"), target: self, action: #selector(statsAction))
         more.bezelStyle = .inline
         let cardRow = NSStackView(views: cards)
         cardRow.distribution = .fillEqually
         cardRow.spacing = 10
 
-        search.placeholderString = "Поиск по надиктованному"
+        search.placeholderString = tr("Search dictations", "Поиск по надиктованному")
         search.delegate = self
-        let feedTitle = NSTextField(labelWithString: "НАДИКТОВАНО")
+        let feedTitle = NSTextField(labelWithString: tr("DICTATED", "НАДИКТОВАНО"))
         feedTitle.font = .systemFont(ofSize: 11, weight: .semibold)
         feedTitle.textColor = .secondaryLabelColor
         let feedHead = NSStackView(views: [feedTitle, NSView(), more])
@@ -239,11 +327,12 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.doubleAction = #selector(copySelected)
         table.target = self
+        table.onCopy = { [weak self] in self?.copySelected() }
         let menu = NSMenu()
-        menu.addItem(withTitle: "Скопировать", action: #selector(copySelected), keyEquivalent: "c").target = self
-        menu.addItem(withTitle: "Исправить и запомнить…", action: #selector(fixSelected), keyEquivalent: "").target = self
+        menu.addItem(withTitle: tr("Copy", "Скопировать"), action: #selector(copySelected), keyEquivalent: "c").target = self
+        menu.addItem(withTitle: tr("Correct and Remember…", "Исправить и запомнить…"), action: #selector(fixSelected), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Удалить", action: #selector(deleteSelected), keyEquivalent: "").target = self
+        menu.addItem(withTitle: tr("Delete", "Удалить"), action: #selector(deleteSelected), keyEquivalent: "").target = self
         table.menu = menu
 
         let scroll = NSScrollView()
@@ -254,10 +343,12 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         table.backgroundColor = .clear
 
         countLabel.textColor = .secondaryLabelColor
-        let tip = NSTextField(labelWithString: "Двойной клик — скопировать · правый клик — исправить или удалить")
+        let tip = NSTextField(labelWithString: tr(
+            "Select text with the mouse and press ⌘C · double-click the time to copy an entry · right-click to correct or delete",
+            "Выделите текст мышью и нажмите ⌘C · двойной клик по времени — скопировать запись · правый клик — исправить или удалить"))
         tip.textColor = .tertiaryLabelColor
         tip.font = .systemFont(ofSize: 11)
-        let clear = NSButton(title: "Очистить всё…", target: self, action: #selector(clearAll))
+        let clear = NSButton(title: tr("Clear All…", "Очистить всё…"), target: self, action: #selector(clearAll))
         let bar = NSStackView(views: [countLabel, tip, NSView(), clear])
 
         let stack = NSStackView(views: [hint, problems, cardRow, feedHead, search, scroll, bar])
@@ -282,25 +373,44 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         let s = status()
         guard s != lastStatus else { return }
         lastStatus = s
-        hint.stringValue = "Зажмите \(s.hotkey), говорите, отпустите — текст вставится туда, где стоит курсор. "
-            + (Prefs.trigger == .holdOrDoubleTap ? "Дважды нажмите \(s.hotkey) — диктовка без рук, ещё одно нажатие — готово. " : "")
-            + (Prefs.trigger == .holdOrTap ? "Короткое нажатие \(s.hotkey) — диктовка без рук до следующего нажатия. " : "")
-            + "Esc — отмена."
+        let k = s.hotkey
+        hint.stringValue = tr("Hold \(k), speak, release — the text is pasted where the cursor is. ",
+                              "Зажмите \(k), говорите, отпустите — текст вставится туда, где стоит курсор. ")
+            + (Prefs.trigger == .holdOrDoubleTap ? tr("Double-press \(k) for hands-free dictation; press once more when done. ",
+                                                      "Дважды нажмите \(k) — диктовка без рук, ещё одно нажатие — готово. ") : "")
+            + (Prefs.trigger == .holdOrTap ? tr("Tap \(k) for hands-free dictation until the next press. ",
+                                                "Короткое нажатие \(k) — диктовка без рук до следующего нажатия. ") : "")
+            + tr("Esc cancels.", "Esc — отмена.")
         problems.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        if !s.micOK { addProblem("Нет доступа к микрофону", "без него диктовка не работает", ("Разрешить…", #selector(micAction))) }
+        if !s.micOK {
+            addProblem(tr("No microphone access", "Нет доступа к микрофону"), tr("dictation doesn’t work without it", "без него диктовка не работает"),
+                       (tr("Allow…", "Разрешить…"), #selector(micAction)))
+        }
         if !s.accessOK {
-            addProblem("Нет доступа «Универсальный доступ»",
-                       "нужен, чтобы слышать клавишу \(s.hotkey) и вставлять текст. Если JustTellMe уже включён в списке, удалите его кнопкой «−» и добавьте заново (так бывает после обновления).",
-                       ("Открыть настройки…", #selector(accessAction)))
+            addProblem(tr("No Accessibility access", "Нет доступа «Универсальный доступ»"),
+                       tr("needed to hear the \(s.hotkey) key and paste text. If JustTellMe is already turned on in the list, remove it with the “−” button and add it again (this can happen after an update).",
+                          "нужен, чтобы слышать клавишу \(s.hotkey) и вставлять текст. Если JustTellMe уже включён в списке, удалите его кнопкой «−» и добавьте заново (так бывает после обновления)."),
+                       (tr("Open Settings…", "Открыть настройки…"), #selector(accessAction)))
         }
-        if !s.modelReady { addProblem("Модель распознавания загружается…", "первый запуск — до минуты", nil, ok: true) }
-        if let app = s.conflictingApp { addProblem("Запущен \(app)", "он тоже слушает клавишу диктовки — закройте его", nil) }
+        if !s.modelReady {
+            addProblem(tr("Loading the speech recognition model…", "Модель распознавания загружается…"),
+                       tr("the first launch takes up to a minute", "первый запуск — до минуты"), nil, ok: true)
+        }
+        if let app = s.conflictingApp {
+            addProblem(tr("\(app) is running", "Запущен \(app)"),
+                       tr("it also listens to the dictation key — quit it", "он тоже слушает клавишу диктовки — закройте его"), nil)
+        }
         if s.fnSwitchesInput {
-            addProblem("Клавиша 🌐 переключает раскладку",
-                       "в «Настройки → Клавиатура» выберите «Нажатие 🌐: Ничего не делать» или смените клавишу в настройках JustTellMe",
-                       ("Настройки клавиатуры…", #selector(keyboardAction)))
+            addProblem(tr("The 🌐 key switches the input source", "Клавиша 🌐 переключает раскладку"),
+                       tr("in System Settings → Keyboard, set “Press 🌐 key to” to “Do Nothing”, or choose another key in JustTellMe settings",
+                          "в «Настройки → Клавиатура» выберите «Нажатие 🌐: Ничего не делать» или смените клавишу в настройках JustTellMe"),
+                       (tr("Keyboard Settings…", "Настройки клавиатуры…"), #selector(keyboardAction)))
         }
-        if let v = s.update { addProblem("Доступна версия \(v)", "обновление ставится в пару кликов, разрешения сохранятся", ("Установить…", #selector(updateAction)), ok: true, mark: "⬆️") }
+        if let v = s.update {
+            addProblem(tr("Version \(v) is available", "Доступна версия \(v)"),
+                       tr("installs in a couple of clicks; permissions are kept", "обновление ставится в пару кликов, разрешения сохранятся"),
+                       (tr("Install…", "Установить…"), #selector(updateAction)), ok: true, mark: "⬆️")
+        }
         problems.isHidden = problems.arrangedSubviews.isEmpty
     }
 
@@ -340,9 +450,9 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         let today = DictationStats(all.filter { Calendar.current.isDate($0.date, inSameDayAs: now) })
         let total = DictationStats(all)
         let streak = DictationStats.streak(all, now: now)
-        cards[0].value = "\(StatsPane.num(today.words)) \(StatsPane.plural(today.words, "слово", "слова", "слов"))"
-        cards[1].value = total.words > 0 ? "\(Int(total.wpm.rounded())) слов/мин" : "—"
-        cards[2].value = "\(streak) \(StatsPane.plural(streak, "день", "дня", "дней"))"
+        cards[0].value = "\(StatsPane.num(today.words)) \(L10n.plural(today.words, en: ("word", "words"), ru: ("слово", "слова", "слов")))"
+        cards[1].value = total.words > 0 ? "\(Int(total.wpm.rounded())) \(tr("wpm", "слов/мин"))" : "—"
+        cards[2].value = "\(streak) \(L10n.plural(streak, en: ("day", "days"), ru: ("день", "дня", "дней")))"
         cards[3].value = StatsPane.duration(total.savedSeconds)
         cards[3].accent = true
 
@@ -355,14 +465,17 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             let d = cal.startOfDay(for: e.date)
             if d != lastDay {
                 lastDay = d
-                let name = cal.isDateInToday(d) ? "Сегодня" : cal.isDateInYesterday(d) ? "Вчера" : Self.dayFmt.string(from: d)
+                let name = cal.isDateInToday(d) ? tr("Today", "Сегодня") : cal.isDateInYesterday(d) ? tr("Yesterday", "Вчера") : Self.dayFmt.string(from: d)
                 rows.append(.day(name))
             }
             rows.append(.entry(e))
         }
         table.reloadData()
-        countLabel.stringValue = all.isEmpty ? "Пока пусто — зажмите \(lastStatus?.hotkey ?? "Fn") и скажите что-нибудь"
-            : q.isEmpty ? "Записей: \(all.count)" : "Найдено: \(shown.count) из \(all.count)"
+        let key = lastStatus?.hotkey ?? "Fn"
+        let entries = L10n.plural(all.count, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))
+        countLabel.stringValue = all.isEmpty ? tr("Nothing here yet — hold \(key) and say something", "Пока пусто — зажмите \(key) и скажите что-нибудь")
+            : q.isEmpty ? tr("\(all.count) \(entries)", "Записей: \(all.count)")
+            : tr("\(shown.count) of \(all.count)", "Найдено: \(shown.count) из \(all.count)")
     }
 
     func controlTextDidChange(_ obj: Notification) { reload() }
@@ -405,6 +518,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
                 top = 7
             } else {
                 t.attributedStringValue = Self.entryText(e)
+                t.isSelectable = true   // select part of the text with the mouse, ⌘C
             }
         }
         NSLayoutConstraint.activate([
@@ -452,7 +566,8 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         guard !items.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(items.map(\.text).joined(separator: "\n"), forType: .string)
-        countLabel.stringValue = items.count == 1 ? "Скопировано" : "Скопировано: \(items.count)"
+        countLabel.stringValue = items.count == 1 ? tr("Copied", "Скопировано")
+            : tr("Copied \(items.count) entries", "Скопировано: \(items.count)")
     }
 
     @objc private func fixSelected() {
@@ -468,10 +583,12 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
 
     @objc private func clearAll() {
         let a = NSAlert()
-        a.messageText = "Очистить всю историю?"
-        a.informativeText = "Будут удалены все \(History.shared.entries.count) записей. Статистика тоже обнулится. Это нельзя отменить."
-        a.addButton(withTitle: "Очистить")
-        a.addButton(withTitle: "Отмена")
+        let n = History.shared.entries.count
+        a.messageText = tr("Clear the whole history?", "Очистить всю историю?")
+        a.informativeText = tr("All \(n) \(L10n.plural(n, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))) will be deleted, and the statistics will be reset. This can’t be undone.",
+                               "Будут удалены все \(n) записей. Статистика тоже обнулится. Это нельзя отменить.")
+        a.addButton(withTitle: tr("Clear", "Очистить"))
+        a.addButton(withTitle: tr("Cancel", "Отмена"))
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return }
         History.shared.clear()

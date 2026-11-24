@@ -2,7 +2,7 @@ import Cocoa
 
 /// Is there a text field to paste into? Asked through Accessibility right after pasting.
 /// It errs towards `.unknown`: a wrong "no field" would pop up a card for nothing, a missed one
-/// only means the text is still in the feed on Главная, as before.
+/// only means the text is still in the feed on Home, as before.
 enum FocusedField: Equatable {
     case text, none, unknown
 
@@ -74,12 +74,12 @@ enum FocusedField: Equatable {
 }
 
 /// Small card above the Dock when the text was most likely pasted nowhere: shows it with a
-/// «Скопировать» button. Never takes focus.
+/// Copy button. Never takes focus.
 final class NoFieldCard: NSObject {
     private var panel: NSPanel?
-    private let title = NSTextField(labelWithString: "Курсор не в поле ввода?")
+    private let title = NSTextField(labelWithString: tr("No text field?", "Курсор не в поле ввода?"))
     private let body = NSTextField(wrappingLabelWithString: "")
-    private let copyButton = NSButton(title: "Скопировать", target: nil, action: nil)
+    private let copyButton = NSButton(title: tr("Copy", "Скопировать"), target: nil, action: nil)
     private var text = ""
     private var hideWork: DispatchWorkItem?
     private let size = NSSize(width: 380, height: 132)
@@ -89,7 +89,7 @@ final class NoFieldCard: NSObject {
         let p = panel ?? make()
         panel = p
         body.stringValue = text
-        copyButton.title = "Скопировать"
+        copyButton.title = tr("Copy", "Скопировать")
         copyButton.isEnabled = true
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
@@ -120,7 +120,7 @@ final class NoFieldCard: NSObject {
     @objc private func copyText() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        copyButton.title = "Скопировано ✓"
+        copyButton.title = tr("Copied ✓", "Скопировано ✓")
         copyButton.isEnabled = false
         hide(after: 0.8)
     }
@@ -149,7 +149,7 @@ final class NoFieldCard: NSObject {
         let w = size.width - 28
         title.font = .systemFont(ofSize: 13, weight: .semibold)
         title.frame = NSRect(x: 14, y: size.height - 30, width: w, height: 18)
-        let sub = NSTextField(labelWithString: "Если текст не появился, скопируйте его:")
+        let sub = NSTextField(labelWithString: tr("If the text didn't appear, copy it:", "Если текст не появился, скопируйте его:"))
         sub.textColor = .secondaryLabelColor
         sub.font = .systemFont(ofSize: 11)
         sub.frame = NSRect(x: 14, y: size.height - 47, width: w, height: 15)
@@ -163,7 +163,7 @@ final class NoFieldCard: NSObject {
         copyButton.bezelStyle = .rounded
         copyButton.keyEquivalent = "\r" // drawn as the default (accent) button
         copyButton.frame = NSRect(x: size.width - 14 - 130, y: 8, width: 130, height: 30)
-        let closeButton = NSButton(title: "Закрыть", target: self, action: #selector(close))
+        let closeButton = NSButton(title: tr("Close", "Закрыть"), target: self, action: #selector(close))
         closeButton.bezelStyle = .rounded
         closeButton.frame = NSRect(x: copyButton.frame.minX - 100, y: 8, width: 100, height: 30)
         for v in [title, sub, body, closeButton, copyButton] as [NSView] { bg.addSubview(v) }

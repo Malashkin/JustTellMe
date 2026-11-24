@@ -1,7 +1,7 @@
 ---
 audience: devops
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-24
 ---
 
 # Build & release
@@ -45,9 +45,9 @@ ad-hoc, and you need to re-grant Accessibility after every build. Override the i
    - builds with the zip, runs the full test suite;
    - tags `vX.Y.Z` and creates the GitHub Release with `dist/JustTellMe.zip` and that CHANGELOG section as notes.
 
-Installed apps see the release within a day (or at once with «Проверить сейчас»). They install it themselves: see
+Installed apps see the release within a day (or at once with “Check Now”). They install it themselves: see
 [ADR 007](../architecture/decisions/007-updates-from-github-releases.md). Build releases only on the machine that has
-the «JustTellMe Local Signing» certificate.
+the “JustTellMe Local Signing” certificate.
 
 ## Install / update by hand
 
@@ -58,7 +58,7 @@ open /Applications/JustTellMe.app
 ```
 
 After an update:
-- If the home page says Accessibility is missing, remove JustTellMe with «−» and add it again.
+- If the home page says Accessibility is missing, remove JustTellMe with “−” and add it again.
 - With Neural Engine on, macOS may prepare the encoder again (15–25 min in the background).
 
 ## Another Mac

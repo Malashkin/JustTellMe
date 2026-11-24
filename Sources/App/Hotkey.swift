@@ -10,14 +10,14 @@ final class PushToTalkHotkey {
         var title: String {
             switch self {
             case .fn: return "Fn (🌐)"
-            case .rightOption: return "Правый ⌥ Option"
+            case .rightOption: return tr("Right ⌥ Option", "Правый ⌥ Option")
             }
         }
-        /// Short form for status lines: "удерживайте Fn".
+        /// Short form for status lines: "hold Fn".
         var short: String {
             switch self {
             case .fn: return "Fn"
-            case .rightOption: return "правый ⌥"
+            case .rightOption: return tr("right ⌥", "правый ⌥")
             }
         }
         fileprivate var keycode: Int64 {
@@ -97,9 +97,9 @@ final class PushToTalkHotkey {
 enum KeyRelease: Equatable {
     /// Held long enough: push-to-talk is over, transcribe.
     case finish
-    /// «Нажать один раз» mode: keep listening until the next press.
+    /// "Tap once" mode: keep listening until the next press.
     case lockHandsFree
-    /// «Нажать дважды» mode: keep recording; a second press within `doubleTapWindow` locks hands-free,
+    /// "Double-tap" mode: keep recording; a second press within `doubleTapWindow` locks hands-free,
     /// otherwise the recording is dropped.
     case awaitSecondTap
     /// A stray short press: drop the recording.
@@ -121,7 +121,7 @@ enum KeyRelease: Equatable {
 }
 
 /// A system-wide shortcut through Carbon's RegisterEventHotKey: the key press is consumed (it never
-/// reaches the frontmost app) and no permission is needed. Used for ⌃⌥V «вставить последнее ещё раз».
+/// reaches the frontmost app) and no permission is needed. Used for ⌃⌥V "Paste Last Again".
 final class GlobalShortcut {
     private var ref: EventHotKeyRef?
     private static var actions: [UInt32: () -> Void] = [:]
