@@ -3,7 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>ru</string>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ru</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>JustTellMe</string>
 	<key>CFBundleExecutable</key>
@@ -33,6 +38,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>JustTellMe записывает голос, пока вы диктуете (удерживаете клавишу диктовки), и распознаёт его локально на этом Mac.</string>
+	<string>JustTellMe records your voice while you dictate (while you hold the dictation key) and recognises it locally on this Mac.</string>
 </dict>
 </plist>

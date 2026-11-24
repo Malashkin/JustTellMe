@@ -58,7 +58,7 @@ enum CorrectionLearner {
                 if !delA.isEmpty && delA.count <= 4 && insB.count <= 4 {
                     res.rules.append((delA.joined(separator: " "), insB.joined(separator: " ")))
                 }
-                // Terms = maximal runs of term-like words ("на Figma" -> "Figma", "pull request" stays).
+                // Terms = maximal runs of term-like words ("on Figma" -> "Figma", "pull request" stays).
                 var run: [String] = []
                 func endRun() {
                     let phrase = run.joined(separator: " ")

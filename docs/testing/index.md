@@ -19,6 +19,9 @@ JTM_SKIP_SLOW=1 scripts/test.sh  # pure logic + quick binary checks, ~3 s after 
 
 Exit code 0 means everything passed. Failures are listed at the end with `file:line`.
 The run uses a fresh temporary `JTM_SUPPORT_DIR`, so your history, dictionary and models are never touched.
+It also sets `JTM_LANG=ru` (and `Tests/main.swift` sets `L10n.isRussian = true`): most tests check the Russian interface
+and the Russian default lists. `Tests/LocalizationTests.swift` switches to English and checks English texts, plurals,
+dates and the default Notes/Tasks lists.
 
 ## Layout
 
@@ -26,8 +29,9 @@ The run uses a fresh temporary `JTM_SUPPORT_DIR`, so your history, dictionary an
 |---|---|---|
 | `Tests/Harness.swift` | — | `T.test` / `T.eq` / `T.ok`, `SeededRandom` for deterministic property tests |
 | `Tests/UnitTests.swift` | unit | stats and streak, Russian plurals and durations, hallucination cleanup, auto-language, streaming cut points (16/48 kHz), correction learning, rule parsing, Neural Engine file names |
-| `Tests/FeatureTests.swift` | unit | 1.1 features: unload default, trailing space for paste-again, «is a text field focused» decisions (incl. Chrome/Electron), version order and GitHub release parsing, waveform bars; voice lists (command words of the default and own lists, misheard or split in two, lookalikes and short words exact, exact beats near miss; parsing and checking typed words; first run defaults and the move from `notes.json`; create/rename/delete a list with its file; entries save/reload/search/delete; task status and done time, deadlines; filters by status, date field and period incl. custom range and overdue; day groups; ticks and bulk actions; sidebar order); selectable text in the feed and notes tables (a click goes to the text, ⌘C copies highlighted rows) |
+| `Tests/FeatureTests.swift` | unit | 1.1 features: unload default, trailing space for paste-again, “is a text field focused” decisions (incl. Chrome/Electron), version order and GitHub release parsing, waveform bars; voice lists (command words of the default and own lists, misheard or split in two, lookalikes and short words exact, exact beats near miss; parsing and checking typed words; first run defaults and the move from `notes.json`; create/rename/delete a list with its file; entries save/reload/search/delete; task status and done time, deadlines; filters by status, date field and period incl. custom range and overdue; day groups; ticks and bulk actions; sidebar order); selectable text in the feed and notes tables (a click goes to the text, ⌘C copies highlighted rows) |
 | `Tests/IntegrationTests.swift` | integration | history file, personal dictionary end to end, built-in dictionary (no client names, checked by hash; valid rules), the app binary (`--learn`, `--list-models`, TTS speech via `--transcribe` and `--stream`, reload after idle via `--unload-cycle`), update archives via `--update-stage` (accepted; wrong version, modified, other certificate, other app refused) and `--update-install --zip` (replaces another copy, no hang, no leftovers) |
+| `Tests/LocalizationTests.swift` | unit | interface language: English texts, plurals and dates, English default lists (Notes/Tasks, opened by “Note”/“Task”), switching to Russian |
 | `Tests/main.swift` | — | runs everything, prints a summary |
 
 ## Writing a test

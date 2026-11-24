@@ -3,11 +3,14 @@ import Cocoa
 // MARK: - Model
 
 /// A voice list: a page in the sidebar that collects dictations starting with one of its command words
-/// («Заметка …» → Заметки). Notes lists are plain; tasks lists add a status, a deadline and date filters.
+/// (e.g. "Note …" → Notes). Notes lists are plain; tasks lists add a status, a deadline and date filters.
 struct VoiceList: Codable, Equatable {
     enum Kind: String, Codable, CaseIterable {
         case notes, tasks
-        var title: String { self == .notes ? "Заметки — просто записи" : "Задачи — статус Backlog/Done, срок, фильтры по датам" }
+        var title: String {
+            self == .notes ? tr("Notes — plain entries", "Заметки — просто записи")
+                           : tr("Tasks — Backlog/Done status, due date, date filters", "Задачи — статус Backlog/Done, срок, фильтры по датам")
+        }
     }
     let id: UUID
     var name: String
@@ -72,7 +75,7 @@ final class VoiceLists {
 
     private var listsURL: URL { Paths.support.appendingPathComponent("lists.json") }
     private func itemsURL(_ id: UUID) -> URL { Paths.support.appendingPathComponent("list-\(id.uuidString).json") }
-    /// Where notes were kept before lists existed; moved into Заметки once.
+    /// Where notes were kept before lists existed; moved into the notes list once.
     private var legacyNotesURL: URL { Paths.support.appendingPathComponent("notes.json") }
 
     private static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
@@ -82,13 +85,17 @@ final class VoiceLists {
 
     private init() { load() }
 
+    /// The lists created on the first run, named in the interface language.
     static func defaultLists() -> [VoiceList] {
-        [VoiceList(id: UUID(), name: "Заметки", keywords: ["Заметка"], kind: .notes),
-         VoiceList(id: UUID(), name: "Задачи", keywords: ["Задача"], kind: .tasks)]
+        L10n.isRussian
+            ? [VoiceList(id: UUID(), name: "Заметки", keywords: ["Заметка"], kind: .notes),
+               VoiceList(id: UUID(), name: "Задачи", keywords: ["Задача"], kind: .tasks)]
+            : [VoiceList(id: UUID(), name: "Notes", keywords: ["Note"], kind: .notes),
+               VoiceList(id: UUID(), name: "Tasks", keywords: ["Task"], kind: .tasks)]
     }
 
     /// Re-read everything (tests point Paths.support at a temporary folder). On the first run creates
-    /// Заметки and Задачи, and moves notes from notes.json into Заметки.
+    /// the notes and tasks lists, and moves notes from notes.json into the notes list.
     func load() {
         cache = [:]
         if let d = try? Data(contentsOf: listsURL), let l = try? Self.decoder.decode([VoiceList].self, from: d) {
@@ -218,15 +225,16 @@ final class VoiceLists {
 
     /// What is wrong with a list as typed, or nil when it can be saved.
     static func problem(name: String, keywords: [String], editing id: UUID?, among lists: [VoiceList]) -> String? {
-        if name.trimmingCharacters(in: .whitespaces).isEmpty { return "Введите название списка." }
-        if keywords.isEmpty { return "Введите хотя бы одно слово-команду." }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty { return tr("Enter a list name.", "Введите название списка.") }
+        if keywords.isEmpty { return tr("Enter at least one command word.", "Введите хотя бы одно слово-команду.") }
         for k in keywords {
             if k.contains(where: { !($0.isLetter || $0.isNumber || $0 == "-") }) {
-                return "«\(k)» — команда должна быть одним словом. Несколько слов разделяйте запятой."
+                return tr("“\(k)” — a command must be a single word. Separate several words with commas.",
+                          "«\(k)» — команда должна быть одним словом. Несколько слов разделяйте запятой.")
             }
             let n = SpokenKeyword.normalize(k)
             if let other = lists.first(where: { $0.id != id && $0.keywords.contains { SpokenKeyword.normalize($0) == n } }) {
-                return "Слово «\(k)» уже открывает список «\(other.name)»."
+                return tr("The word “\(k)” already opens the list “\(other.name)”.", "Слово «\(k)» уже открывает список «\(other.name)».")
             }
         }
         return nil
@@ -250,19 +258,21 @@ final class VoiceLists {
 enum ListFilter {
     enum Status: Int, CaseIterable {
         case all, backlog, done
-        var title: String { ["Все", "Backlog", "Done"][rawValue] }
+        var title: String { [tr("All", "Все"), "Backlog", "Done"][rawValue] }
     }
 
     /// Which date of a task the period applies to.
     enum DateField: Int, CaseIterable {
         case created, due, done
-        var title: String { ["Создана", "Срок", "Сделана"][rawValue] }
+        var title: String { [tr("Created", "Создана"), tr("Due", "Срок"), tr("Done", "Сделана")][rawValue] }
     }
 
     enum Period: Equatable {
         case today, week, month, all
         case custom(Date, Date)
-        static let presets: [(String, Period)] = [("Сегодня", .today), ("7 дней", .week), ("30 дней", .month), ("Все даты", .all)]
+        static var presets: [(String, Period)] {
+            [(tr("Today", "Сегодня"), .today), (tr("7 days", "7 дней"), .week), (tr("30 days", "30 дней"), .month), (tr("All dates", "Все даты"), .all)]
+        }
     }
 
     static func date(of item: ListItem, _ field: DateField) -> Date? {
@@ -311,7 +321,7 @@ enum ListFilter {
     }
 
     /// Day groups for the table: by the chosen date, newest first (a deadline: soonest first).
-    /// Entries without that date go last, under «Без срока» / «Не сделаны».
+    /// Entries without that date go last, under "No due date" / "Not done".
     static func groups(_ items: [ListItem], field: DateField, now: Date) -> [(title: String, items: [ListItem])] {
         let cal = Calendar.current
         let dated = items.filter { date(of: $0, field) != nil }
@@ -330,22 +340,19 @@ enum ListFilter {
             }
             out[out.count - 1].1.append(i)
         }
-        if !undated.isEmpty { out.append((field == .due ? "Без срока" : "Не сделаны", undated.sorted { $0.date > $1.date })) }
+        if !undated.isEmpty { out.append((field == .due ? tr("No due date", "Без срока") : tr("Not done", "Не сделаны"), undated.sorted { $0.date > $1.date })) }
         return out
     }
 
-    private static func fmt(_ pattern: String) -> DateFormatter {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = pattern; return f
-    }
-    private static let stampFmt = fmt("d MMM, HH:mm")
-    private static let shortDateFmt = fmt("d MMM")
-    private static let dayFmt = fmt("d MMMM yyyy, EEEE")
-    private static let shortDayFmt = fmt("d MMMM")
+    private static var stampFmt: DateFormatter { L10n.formatter(en: "MMM d, HH:mm", ru: "d MMM, HH:mm") }
+    private static var shortDateFmt: DateFormatter { L10n.formatter(en: "MMM d", ru: "d MMM") }
+    private static var dayFmt: DateFormatter { L10n.formatter(en: "EEEE, MMMM d, yyyy", ru: "d MMMM yyyy, EEEE") }
+    private static var shortDayFmt: DateFormatter { L10n.formatter(en: "MMMM d", ru: "d MMMM") }
 
-    /// Day header: always shows the date, «Сегодня», «Вчера» or «Завтра» in front of it.
+    /// Day header: always shows the date, with "Today", "Yesterday" or "Tomorrow" in front of it.
     static func dayTitle(_ day: Date, now: Date = Date()) -> String {
         let cal = Calendar.current
-        for (offset, word) in [(0, "Сегодня"), (-1, "Вчера"), (1, "Завтра")] {
+        for (offset, word) in [(0, tr("Today", "Сегодня")), (-1, tr("Yesterday", "Вчера")), (1, tr("Tomorrow", "Завтра"))] {
             if let d = cal.date(byAdding: .day, value: offset, to: now), cal.isDate(day, inSameDayAs: d) {
                 return word + ", " + shortDayFmt.string(from: day)
             }
@@ -353,14 +360,14 @@ enum ListFilter {
         return dayFmt.string(from: day)
     }
 
-    /// Date and time shown on every entry, e.g. «23 нояб., 10:04».
+    /// Date and time shown on every entry, e.g. "Nov 23, 10:04".
     static func stamp(_ date: Date) -> String { stampFmt.string(from: date) }
 
-    /// The small line under a task: «Срок: 25 нояб. — просрочено · Сделано: 24 нояб., 10:04».
+    /// The small line under a task: "Due Nov 25 — overdue · Done Nov 24, 10:04".
     static func detail(_ item: ListItem, now: Date) -> String? {
         var parts: [String] = []
-        if let due = item.due { parts.append("Срок: " + shortDateFmt.string(from: due) + (isOverdue(item, now: now) ? " — просрочено" : "")) }
-        if item.status == .done, let d = item.doneAt { parts.append("Сделано: " + stamp(d)) }
+        if let due = item.due { parts.append(tr("Due ", "Срок: ") + shortDateFmt.string(from: due) + (isOverdue(item, now: now) ? tr(" — overdue", " — просрочено") : "")) }
+        if item.status == .done, let d = item.doneAt { parts.append(tr("Done ", "Сделано: ") + stamp(d)) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
@@ -379,11 +386,11 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private let table = SelectableTextTableView()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
-    private let deleteButton = NSButton(title: "Удалить", target: nil, action: nil)
-    private let checkAllButton = NSButton(title: "Отметить все", target: nil, action: nil)
+    private let deleteButton = NSButton(title: tr("Delete", "Удалить"), target: nil, action: nil)
+    private let checkAllButton = NSButton(title: tr("Check All", "Отметить все"), target: nil, action: nil)
     private let doneButton = NSButton(title: "Done", target: nil, action: nil)
-    private let backlogButton = NSButton(title: "В Backlog", target: nil, action: nil)
-    private let dueButton = NSButton(title: "Срок…", target: nil, action: nil)
+    private let backlogButton = NSButton(title: tr("To Backlog", "В Backlog"), target: nil, action: nil)
+    private let dueButton = NSButton(title: tr("Due Date…", "Срок…"), target: nil, action: nil)
     private let statusControl = NSSegmentedControl(labels: ListFilter.Status.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private let fieldPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let periodPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -407,7 +414,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     // MARK: pure helpers (tested)
 
     /// Ticks that still point at a visible entry (a search, a filter or a deletion drops the rest,
-    /// so «Удалить» never touches an entry the user cannot see).
+    /// so "Delete" never touches an entry the user cannot see).
     static func visibleChecks(_ checked: Set<UUID>, shown: [ListItem]) -> Set<UUID> {
         checked.intersection(shown.map(\.id))
     }
@@ -417,32 +424,39 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         checked.isEmpty ? highlighted : shown.filter { checked.contains($0.id) }
     }
 
-    /// «Отметить все» ticks every visible entry; when all are ticked already it clears the ticks.
+    /// "Check All" ticks every visible entry; when all are ticked already it clears the ticks.
     static func toggleAll(_ checked: Set<UUID>, shown: [ListItem]) -> Set<UUID> {
         let ids = Set(shown.map(\.id))
         return !ids.isEmpty && ids.isSubset(of: checked) ? [] : ids
     }
 
     static func deleteTitle(_ n: Int, kind: VoiceList.Kind) -> String {
-        guard n > 0 else { return "Удалить" }
-        let noun = kind == .tasks ? StatsPane.plural(n, "задачу", "задачи", "задач") : StatsPane.plural(n, "запись", "записи", "записей")
-        return "Удалить \(n) \(noun)"
+        guard n > 0 else { return tr("Delete", "Удалить") }
+        return tr("Delete \(n) \(noun(n, kind: kind))", "Удалить \(n) \(noun(n, kind: kind))")
+    }
+
+    /// "task"/"entry" for a count, in the accusative form Russian needs after «Удалить».
+    static func noun(_ n: Int, kind: VoiceList.Kind) -> String {
+        kind == .tasks ? L10n.plural(n, en: ("task", "tasks"), ru: ("задачу", "задачи", "задач"))
+                       : L10n.plural(n, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))
     }
 
     /// Several entries are copied one per line, in the order shown.
     static func copyText(_ items: [ListItem]) -> String { items.map(\.text).joined(separator: "\n") }
 
     static func keywordHint(_ l: VoiceList) -> String {
-        let words = l.keywords.map { "«\($0)»" }.joined(separator: ", ")
-        return "Начните фразу со слова \(words) — текст не вставится в приложение, а сохранится здесь. "
-            + "Выделите текст мышью и нажмите ⌘C; отметьте галочками, чтобы удалить несколько."
+        let words = l.keywords.map { tr("“\($0)”", "«\($0)»") }.joined(separator: ", ")
+        return tr("Start a phrase with \(words) and the text is saved here instead of being pasted into the app. "
+                  + "Select text with the mouse and press ⌘C; tick entries to delete several at once.",
+                  "Начните фразу со слова \(words) — текст не вставится в приложение, а сохранится здесь. "
+                  + "Выделите текст мышью и нажмите ⌘C; отметьте галочками, чтобы удалить несколько.")
     }
 
     // MARK: building
 
     private func build() -> NSView {
         titleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
-        let configure = NSButton(title: "Настроить…", target: self, action: #selector(configureAction))
+        let configure = NSButton(title: tr("Edit List…", "Настроить…"), target: self, action: #selector(configureAction))
         configure.bezelStyle = .rounded
         let head = NSStackView(views: [titleLabel, NSView(), configure])
         hint.textColor = .secondaryLabelColor
@@ -453,27 +467,27 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         fieldPopup.addItems(withTitles: ListFilter.DateField.allCases.map(\.title))
         fieldPopup.target = self
         fieldPopup.action = #selector(filterChanged)
-        periodPopup.addItems(withTitles: ListFilter.Period.presets.map(\.0) + ["Свой период…"])
+        periodPopup.addItems(withTitles: ListFilter.Period.presets.map(\.0) + [tr("Custom range…", "Свой период…")])
         periodPopup.selectItem(at: 3)
         periodPopup.target = self
         periodPopup.action = #selector(filterChanged)
         for p in [fromPicker, toPicker] {
             p.datePickerStyle = .textFieldAndStepper
             p.datePickerElements = .yearMonthDay
-            p.locale = Locale(identifier: "ru_RU")
+            p.locale = L10n.locale
             p.dateValue = Date()
             p.target = self
             p.action = #selector(filterChanged)
         }
         fromPicker.dateValue = Calendar.current.date(byAdding: .day, value: -6, to: Date())!
-        let statusLabel = NSTextField(labelWithString: "Статус:")
-        let dateLabel = NSTextField(labelWithString: "Дата:")
+        let statusLabel = NSTextField(labelWithString: tr("Status:", "Статус:"))
+        let dateLabel = NSTextField(labelWithString: tr("Date:", "Дата:"))
         filterRow = NSStackView(views: [statusLabel, statusControl, NSView(), dateLabel, fieldPopup, periodPopup, fromPicker, dash, toPicker])
         filterRow.spacing = 8
         filterRow.setCustomSpacing(4, after: statusLabel)
         filterRow.setCustomSpacing(4, after: dateLabel)
 
-        search.placeholderString = "Поиск"
+        search.placeholderString = tr("Search", "Поиск")
         search.delegate = self
 
         table.headerView = nil
@@ -519,7 +533,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         return stack
     }
 
-    /// Columns depend on the kind, which can be changed in «Настроить…».
+    /// Columns depend on the kind, which can be changed in "Edit List…".
     private func rebuildColumns() {
         let ids = kind == .tasks ? [("check", 22.0), ("status", 96.0), ("time", 104.0), ("text", 480.0)]
                                  : [("check", 22.0), ("time", 104.0), ("text", 540.0)]
@@ -572,12 +586,17 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         updateButtons()
         let filtered = shown.count != all.count
         if all.isEmpty {
-            countLabel.stringValue = "Пока пусто"
+            countLabel.stringValue = tr("Nothing here yet", "Пока пусто")
         } else if l.kind == .tasks {
             let open = all.filter { $0.status == .backlog }.count
-            countLabel.stringValue = (filtered ? "Показано: \(shown.count) из \(all.count)" : "Задач: \(all.count)") + " · в Backlog: \(open)"
+            let tasks = L10n.plural(all.count, en: ("task", "tasks"), ru: ("задача", "задачи", "задач"))
+            countLabel.stringValue = filtered
+                ? tr("\(shown.count) of \(all.count) · \(open) in Backlog", "Показано: \(shown.count) из \(all.count) · в Backlog: \(open)")
+                : tr("\(all.count) \(tasks) · \(open) in Backlog", "Задач: \(all.count) · в Backlog: \(open)")
         } else {
-            countLabel.stringValue = filtered ? "Найдено: \(shown.count) из \(all.count)" : "Записей: \(all.count)"
+            let entries = L10n.plural(all.count, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))
+            countLabel.stringValue = filtered ? tr("\(shown.count) of \(all.count)", "Найдено: \(shown.count) из \(all.count)")
+                                              : tr("\(all.count) \(entries)", "Записей: \(all.count)")
         }
     }
 
@@ -606,7 +625,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         backlogButton.isEnabled = n > 0
         dueButton.isEnabled = n > 0
         checkAllButton.isEnabled = !shown.isEmpty
-        checkAllButton.title = !shown.isEmpty && Set(shown.map(\.id)).isSubset(of: checked) ? "Снять отметки" : "Отметить все"
+        checkAllButton.title = !shown.isEmpty && Set(shown.map(\.id)).isSubset(of: checked) ? tr("Uncheck All", "Снять отметки") : tr("Check All", "Отметить все")
     }
 
     // MARK: actions
@@ -640,7 +659,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         guard !items.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(Self.copyText(items), forType: .string)
-        countLabel.stringValue = items.count == 1 ? "Скопировано" : "Скопировано: \(items.count)"
+        countLabel.stringValue = items.count == 1 ? tr("Copied", "Скопировано")
+            : tr("Copied \(items.count) \(Self.noun(items.count, kind: kind))", "Скопировано: \(items.count)")
     }
 
     @objc private func menuDone() { VoiceLists.shared.setStatus(.done, ids: Set(selected.map(\.id)), in: listID) }
@@ -652,19 +672,20 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private func askDue(_ items: [ListItem]) {
         guard !items.isEmpty else { return }
         let a = NSAlert()
-        a.messageText = items.count == 1 ? "Срок задачи" : "Срок для \(items.count) \(StatsPane.plural(items.count, "задачи", "задач", "задач"))"
-        a.informativeText = items.count == 1 ? "«\(items[0].text.prefix(120))»" : ""
+        a.messageText = items.count == 1 ? tr("Due date", "Срок задачи")
+            : tr("Due date for \(items.count) tasks", "Срок для \(items.count) \(L10n.plural(items.count, en: ("task", "tasks"), ru: ("задачи", "задач", "задач")))")
+        a.informativeText = items.count == 1 ? tr("“\(items[0].text.prefix(120))”", "«\(items[0].text.prefix(120))»") : ""
         let picker = NSDatePicker()
         picker.datePickerStyle = .clockAndCalendar
         picker.datePickerElements = .yearMonthDay
-        picker.locale = Locale(identifier: "ru_RU")
+        picker.locale = L10n.locale
         picker.dateValue = items.compactMap(\.due).first ?? Date()
         picker.sizeToFit()
         a.accessoryView = picker
-        a.addButton(withTitle: "Поставить срок")
-        a.addButton(withTitle: "Отмена")
+        a.addButton(withTitle: tr("Set Due Date", "Поставить срок"))
+        a.addButton(withTitle: tr("Cancel", "Отмена"))
         let hasDue = items.contains { $0.due != nil }
-        if hasDue { a.addButton(withTitle: "Убрать срок") }
+        if hasDue { a.addButton(withTitle: tr("Clear Due Date", "Убрать срок")) }
         let r = a.runModal()
         let ids = Set(items.map(\.id))
         if r == .alertFirstButtonReturn { VoiceLists.shared.setDue(picker.dateValue, ids: ids, in: listID) }
@@ -674,11 +695,12 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private func confirmDelete(_ items: [ListItem]) {
         guard !items.isEmpty else { return }
         let a = NSAlert()
-        let noun = kind == .tasks ? StatsPane.plural(items.count, "задачу", "задачи", "задач") : StatsPane.plural(items.count, "запись", "записи", "записей")
-        a.messageText = items.count == 1 ? "Удалить \(kind == .tasks ? "задачу" : "запись")?" : "Удалить \(items.count) \(noun)?"
-        a.informativeText = items.count == 1 ? "«\(items[0].text.prefix(120))»\n\nЭто нельзя отменить." : "Это нельзя отменить."
-        a.addButton(withTitle: "Удалить")
-        a.addButton(withTitle: "Отмена")
+        let noun = Self.noun(items.count, kind: kind)
+        a.messageText = items.count == 1 ? tr("Delete this \(noun)?", "Удалить \(noun)?") : tr("Delete \(items.count) \(noun)?", "Удалить \(items.count) \(noun)?")
+        let undo = tr("This can’t be undone.", "Это нельзя отменить.")
+        a.informativeText = items.count == 1 ? tr("“\(items[0].text.prefix(120))”", "«\(items[0].text.prefix(120))»") + "\n\n" + undo : undo
+        a.addButton(withTitle: tr("Delete", "Удалить"))
+        a.addButton(withTitle: tr("Cancel", "Отмена"))
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return }
         checked.subtract(items.map(\.id))
@@ -738,7 +760,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             if id == "check" {
                 let box = NSButton(checkboxWithTitle: "", target: self, action: #selector(checkToggled(_:)))
                 box.state = checked.contains(i.id) ? .on : .off
-                box.setAccessibilityLabel("Отметить")
+                box.setAccessibilityLabel(tr("Select", "Отметить"))
                 control = box
             } else {
                 let pop = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -806,26 +828,26 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
 }
 
 extension ListPane: NSMenuDelegate {
-    /// The right-click menu is rebuilt each time: task actions only in tasks lists, «Убрать срок» only with a deadline.
+    /// The right-click menu is rebuilt each time: task actions only in tasks lists, "Clear Due Date" only with a deadline.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let items = selected
         guard !items.isEmpty else { return }
         func add(_ title: String, _ sel: Selector) { menu.addItem(withTitle: title, action: sel, keyEquivalent: "").target = self }
-        add("Скопировать", #selector(copyClicked))
+        add(tr("Copy", "Скопировать"), #selector(copyClicked))
         if kind == .tasks {
             menu.addItem(.separator())
             if items.contains(where: { $0.status == .backlog }) { add("Done", #selector(menuDone)) }
-            if items.contains(where: { $0.status == .done }) { add("В Backlog", #selector(menuBacklog)) }
-            add("Срок…", #selector(menuDue))
-            if items.contains(where: { $0.due != nil }) { add("Убрать срок", #selector(menuClearDue)) }
+            if items.contains(where: { $0.status == .done }) { add(tr("To Backlog", "В Backlog"), #selector(menuBacklog)) }
+            add(tr("Due Date…", "Срок…"), #selector(menuDue))
+            if items.contains(where: { $0.due != nil }) { add(tr("Clear Due Date", "Убрать срок"), #selector(menuClearDue)) }
         }
         menu.addItem(.separator())
-        add("Удалить", #selector(menuDelete))
+        add(tr("Delete", "Удалить"), #selector(menuDelete))
     }
 }
 
-// MARK: - «Новый список» / «Настроить…» dialog
+// MARK: - "New List" / "Edit List…" dialog
 
 enum ListEditor {
     enum Result { case saved(VoiceList), deleted, cancelled }
@@ -834,20 +856,22 @@ enum ListEditor {
     static func run(_ existing: VoiceList?) -> Result {
         let store = VoiceLists.shared
         let name = NSTextField(string: existing?.name ?? "")
-        name.placeholderString = "Например, Идеи"
+        name.placeholderString = tr("For example, Ideas", "Например, Идеи")
         let words = NSTextField(string: existing?.keywords.joined(separator: ", ") ?? "")
-        words.placeholderString = "Например, Идея, Мысль"
+        words.placeholderString = tr("For example, Idea, Thought", "Например, Идея, Мысль")
         let kind = NSPopUpButton(frame: .zero, pullsDown: false)
         kind.addItems(withTitles: VoiceList.Kind.allCases.map(\.title))
         kind.selectItem(at: existing?.kind == .tasks ? 1 : 0)
-        let note = NSTextField(wrappingLabelWithString: "Скажите одно из этих слов в начале фразы — текст попадёт в этот список. Несколько слов разделяйте запятой. Слова от 6 букв срабатывают, даже если распознались с ошибкой в одну букву.")
+        let note = NSTextField(wrappingLabelWithString: tr(
+            "Say one of these words at the start of a phrase and the text goes to this list. Separate several words with commas. Words of 6 letters or more work even if one letter is misheard.",
+            "Скажите одно из этих слов в начале фразы — текст попадёт в этот список. Несколько слов разделяйте запятой. Слова от 6 букв срабатывают, даже если распознались с ошибкой в одну букву."))
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
         let grid = NSGridView(views: [
-            [NSTextField(labelWithString: "Название:"), name],
-            [NSTextField(labelWithString: "Слова-команды:"), words],
+            [NSTextField(labelWithString: tr("Name:", "Название:")), name],
+            [NSTextField(labelWithString: tr("Command words:", "Слова-команды:")), words],
             [NSTextField(labelWithString: ""), note],
-            [NSTextField(labelWithString: "Тип:"), kind],
+            [NSTextField(labelWithString: tr("Type:", "Тип:")), kind],
         ])
         grid.column(at: 0).xPlacement = .trailing
         grid.rowSpacing = 8
@@ -857,12 +881,12 @@ enum ListEditor {
         var error = ""
         while true {
             let a = NSAlert()
-            a.messageText = existing == nil ? "Новый список" : "Настроить «\(existing!.name)»"
+            a.messageText = existing == nil ? tr("New List", "Новый список") : tr("Edit “\(existing!.name)”", "Настроить «\(existing!.name)»")
             a.informativeText = error
             a.accessoryView = grid
-            a.addButton(withTitle: existing == nil ? "Создать" : "Сохранить")
-            a.addButton(withTitle: "Отмена")
-            if existing != nil { a.addButton(withTitle: "Удалить список…") }
+            a.addButton(withTitle: existing == nil ? tr("Create", "Создать") : tr("Save", "Сохранить"))
+            a.addButton(withTitle: tr("Cancel", "Отмена"))
+            if existing != nil { a.addButton(withTitle: tr("Delete List…", "Удалить список…")) }
             a.window.initialFirstResponder = name
             let r = a.runModal()
             if r == .alertSecondButtonReturn { return .cancelled }
@@ -888,10 +912,12 @@ enum ListEditor {
     private static func confirmDelete(_ l: VoiceList) -> Bool {
         let n = VoiceLists.shared.items(l.id).count
         let a = NSAlert()
-        a.messageText = "Удалить список «\(l.name)»?"
-        a.informativeText = n == 0 ? "Список пуст." : "Вместе с ним удалятся \(n) \(StatsPane.plural(n, "запись", "записи", "записей")). Это нельзя отменить."
-        a.addButton(withTitle: "Удалить")
-        a.addButton(withTitle: "Отмена")
+        let entries = L10n.plural(n, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))
+        a.messageText = tr("Delete the list “\(l.name)”?", "Удалить список «\(l.name)»?")
+        a.informativeText = n == 0 ? tr("The list is empty.", "Список пуст.")
+            : tr("Its \(n) \(entries) will be deleted too. This can’t be undone.", "Вместе с ним удалятся \(n) \(entries). Это нельзя отменить.")
+        a.addButton(withTitle: tr("Delete", "Удалить"))
+        a.addButton(withTitle: tr("Cancel", "Отмена"))
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return false }
         VoiceLists.shared.removeList(l.id)

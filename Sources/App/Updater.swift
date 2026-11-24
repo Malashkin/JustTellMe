@@ -122,7 +122,7 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
                 // The API allows 60 requests an hour per IP address, shared by everyone behind it (an office NAT).
                 return fetchLatestFromPage(done)
             }
-            else { r = .failure(UpdateError("GitHub ответил \(code)")) }
+            else { r = .failure(UpdateError(tr("GitHub returned \(code)", "GitHub ответил \(code)"))) }
             DispatchQueue.main.async { done(r) }
         }.resume()
     }
@@ -141,7 +141,7 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
                     Release(version: $0, page: page,
                             zip: URL(string: "https://github.com/\(repo)/releases/download/v\($0)/\(assetName)"), size: 0, notes: "")
                 })
-            } else { r = .failure(UpdateError("GitHub недоступен")) }
+            } else { r = .failure(UpdateError(tr("GitHub is unavailable", "GitHub недоступен"))) }
             DispatchQueue.main.async { done(r) }
         }.resume()
     }
@@ -237,23 +237,24 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
     }
 
     private static func verify(unpacking zip: URL, into dir: URL, expectVersion: String?) throws -> URL {
-        guard run("/usr/bin/ditto", ["-x", "-k", zip.path, dir.path]).status == 0 else { throw UpdateError("архив повреждён") }
+        guard run("/usr/bin/ditto", ["-x", "-k", zip.path, dir.path]).status == 0 else { throw UpdateError(tr("the archive is damaged", "архив повреждён")) }
         let app = dir.appendingPathComponent("JustTellMe.app")
         guard let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")) else {
-            throw UpdateError("в архиве нет JustTellMe.app")
+            throw UpdateError(tr("the archive doesn't contain JustTellMe.app", "в архиве нет JustTellMe.app"))
         }
         let myID = Bundle.main.bundleIdentifier ?? "com.justtellme.app"
-        guard info["CFBundleIdentifier"] as? String == myID else { throw UpdateError("в архиве другое приложение") }
+        guard info["CFBundleIdentifier"] as? String == myID else { throw UpdateError(tr("the archive contains a different app", "в архиве другое приложение")) }
         if let v = expectVersion, info["CFBundleShortVersionString"] as? String != v {
-            throw UpdateError("в архиве версия \(info["CFBundleShortVersionString"] as? String ?? "?") вместо \(v)")
+            let found = info["CFBundleShortVersionString"] as? String ?? "?"
+            throw UpdateError(tr("the archive contains version \(found) instead of \(v)", "в архиве версия \(found) вместо \(v)"))
         }
         guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]).status == 0 else {
-            throw UpdateError("подпись приложения нарушена")
+            throw UpdateError(tr("the app's signature is broken", "подпись приложения нарушена"))
         }
         // Same certificate as the running app. An ad-hoc signed (developer) build has no certificate to compare.
         if let req = designatedRequirement(of: Bundle.main.bundleURL), !req.contains("cdhash") {
             guard run("/usr/bin/codesign", ["--verify", "-R", "=" + req, app.path]).status == 0 else {
-                throw UpdateError("приложение подписано другим сертификатом")
+                throw UpdateError(tr("the app is signed with a different certificate", "приложение подписано другим сертификатом"))
             }
         }
         return app
@@ -295,7 +296,7 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
         } else {
             p.waitUntilExit()
             state = .idle
-            finish(p.terminationStatus == 0 ? nil : UpdateError("не удалось заменить приложение"))
+            finish(p.terminationStatus == 0 ? nil : UpdateError(tr("couldn't replace the app", "не удалось заменить приложение")))
         }
     }
 

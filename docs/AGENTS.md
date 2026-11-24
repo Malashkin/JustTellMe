@@ -9,7 +9,9 @@ updated: 2026-11-24
 JustTellMe is a local push-to-talk dictation app for macOS on Apple Silicon. It replaces Wispr Flow.
 You hold Fn (or right ⌥) and speak; when you release, the text is pasted where the cursor is.
 Speech is recognised entirely on the Mac by whisper.cpp (large-v3-turbo). Russian and English work,
-including Russian speech with English terms. It lives in the menu bar and has one main window. A dictation that starts with a voice list's command word («Заметка», «Задача», or the user's own) is saved to that list instead of being pasted.
+including Russian speech with English terms. The interface follows the system language: English, or Russian when macOS prefers Russian
+(`JTM_LANG=en|ru` forces it). It lives in the menu bar and has one main window. A dictation that starts with a voice list's command word
+(“Note”, “Task”, or the user's own; «Заметка», «Задача» on a Russian system) is saved to that list instead of being pasted.
 
 ## Documentation map
 
@@ -47,19 +49,19 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - `--stream file.wav` plays the file in real time through the streaming path and prints the wait after "release"
 - `--learn "recognised" "corrected"` and `--list-models`
 - `--audio-info [--test-mute]` and `--demo-paste "text"`
-- `--demo-overlay [out.png]`, `--demo-window out-prefix`, `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the «Курсор не в поле ввода?» card or the «Сохранено в «Заметки»» card to PNG
+- `--demo-overlay [out.png]`, `--demo-window out-prefix`, `--demo-card out.png` and `--demo-note-card out.png` render the overlay, every page of the main window, the “No text field?” card or the “Saved to “Notes”” card to PNG
 - `--unload-cycle file.wav [--encoder …]` unloads and reloads the model as after idle and prints the timings; `--idle-unload file.wav` checks the idle timer
 - `--focus-check [seconds]` prints whether a text field is focused in the frontmost app (run via `open -a dist/JustTellMe.app --stdout out.txt --args --focus-check 2` so the app's own Accessibility grant applies)
 - `--update-check [--page]`, `--update-stage file.zip [--version X]`, `--update-install other/JustTellMe.app [--zip file.zip --version X]` drive the updater
 
-`JTM_SUPPORT_DIR=/some/dir` makes the app use another data folder (the tests rely on this).
+`JTM_SUPPORT_DIR=/some/dir` makes the app use another data folder (the tests rely on this). `JTM_LANG=en|ru` forces the interface language.
 
 ## Coding conventions
 
 - Plain AppKit built in code: no nibs, no SwiftUI, no SwiftPM or Xcode project. `build.sh` compiles `Sources/App/*.swift` with `swiftc`.
 - Match the surrounding style: short doc comments (`///`) on types and non-obvious functions, `NSStackView` layouts, closures for callbacks (`onChange`, `onFix`, …).
-- User-facing text is Russian. Code, comments and commit messages are English.
-- Preferences go through `Prefs` (`Sources/App/Settings.swift`). A setting appears both in the menu-bar «Настройки» submenu and on the Settings page (`SettingsPane`), so keep the two in sync.
+- User-facing text is English with a Russian translation: wrap it in `tr("English", "Русский")` (`Sources/App/L10n.swift`); counts use `L10n.plural`, dates `L10n.formatter`. Code, comments and commit messages are English.
+- Preferences go through `Prefs` (`Sources/App/Settings.swift`). A setting appears both in the menu-bar Settings submenu and on the Settings page (`SettingsPane`), so keep the two in sync.
 - Pure logic (stats, text cleanup, cut points, learning, vocabulary) lives in `static func`s, so it can be unit-tested.
 - Commit after each finished change and push to `github.com/Malashkin/JustTellMe`. End messages with the `Co-Authored-By` line.
 
@@ -80,5 +82,5 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 - **8 GB Macs:** with Neural Engine on, expect about 1 GB more memory. The GPU path slows down 2–3× when Chrome or VS Code keep the GPU busy.
 - **Screen capture of our windows** needs Screen Recording permission for the terminal. Use `--demo-window` to check layouts instead.
 - `Paths.support` is a `static let`: set `JTM_SUPPORT_DIR` before anything touches `Paths`.
-- **Releases must be signed with «JustTellMe Local Signing».** The updater refuses a build signed with another certificate, so a release built on a machine without it cannot update existing installs.
+- **Releases must be signed with “JustTellMe Local Signing”.** The updater refuses a build signed with another certificate, so a release built on a machine without it cannot update existing installs.
 - **Don't cut pauses inside a clip** before recognition: it makes whisper loop on the last phrase ([ADR 008](architecture/decisions/008-keep-pauses-inside-a-clip.md)).

@@ -57,7 +57,9 @@ struct DictationStats {
 final class StatsPane: NSObject {
     enum Period: Int, CaseIterable {
         case today, week, month, all
-        var title: String { ["Сегодня", "7 дней", "30 дней", "Всё время"][rawValue] }
+        var title: String {
+            [tr("Today", "Сегодня"), tr("7 days", "7 дней"), tr("30 days", "30 дней"), tr("All time", "Всё время")][rawValue]
+        }
         func includes(_ d: Date, now: Date) -> Bool {
             let cal = Calendar.current
             switch self {
@@ -84,7 +86,8 @@ final class StatsPane: NSObject {
         periodControl.action = #selector(periodChanged)
         let top = NSStackView(views: [periodControl, NSView()])
 
-        cards = ["Слов", "Символов", "Диктовок", "Время речи", "Скорость", "Сэкономлено"].map { StatCard(title: $0) }
+        cards = [tr("Words", "Слов"), tr("Characters", "Символов"), tr("Dictations", "Диктовок"),
+                 tr("Speaking Time", "Время речи"), tr("Speed", "Скорость"), tr("Time Saved", "Сэкономлено")].map { StatCard(title: $0) }
         let grid = NSGridView(views: [Array(cards[0..<3]), Array(cards[3..<6])])
         grid.rowSpacing = 10
         grid.columnSpacing = 10
@@ -96,14 +99,16 @@ final class StatsPane: NSObject {
 
         for s in [appsList, langsList] { s.orientation = .vertical; s.alignment = .leading; s.spacing = 6 }
         streakLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        let left = section("Где диктуешь", appsList)
-        let right = section("Языки", langsList, extra: streakLabel)
+        let left = section(tr("Where You Dictate", "Где диктуешь"), appsList)
+        let right = section(tr("Languages", "Языки"), langsList, extra: streakLabel)
         let bottom = NSStackView(views: [left, right])
         bottom.distribution = .fillEqually
         bottom.alignment = .top
         bottom.spacing = 24
 
-        let foot = NSTextField(wrappingLabelWithString: "«Сэкономлено» — сколько времени заняло бы набрать эти слова на клавиатуре (\(Int(DictationStats.typingWPM)) слов/мин) минус время самой диктовки. Всё считается локально по истории диктовок.")
+        let foot = NSTextField(wrappingLabelWithString: tr(
+            "“Time Saved” is how long typing these words on a keyboard would take (\(Int(DictationStats.typingWPM)) words/min) minus the time spent dictating. Everything is calculated locally from your dictation history.",
+            "«Сэкономлено» — сколько времени заняло бы набрать эти слова на клавиатуре (\(Int(DictationStats.typingWPM)) слов/мин) минус время самой диктовки. Всё считается локально по истории диктовок."))
         foot.font = .systemFont(ofSize: 11)
         foot.textColor = .tertiaryLabelColor
         foot.preferredMaxLayoutWidth = 700
@@ -157,33 +162,35 @@ final class StatsPane: NSObject {
 
         let values = [
             Self.num(st.words), Self.num(st.chars), Self.num(st.dictations),
-            Self.duration(st.seconds), st.words > 0 ? "\(Int(st.wpm.rounded())) слов/мин" : "—", Self.duration(st.savedSeconds),
+            Self.duration(st.seconds), st.words > 0 ? tr("\(Int(st.wpm.rounded())) wpm", "\(Int(st.wpm.rounded())) слов/мин") : "—", Self.duration(st.savedSeconds),
         ]
         for (c, v) in zip(cards, values) { c.value = v }
         cards[5].accent = true
 
         let days = period == .month || period == .all ? 30 : 14
-        chartTitle.stringValue = "СЛОВ ПО ДНЯМ — ПОСЛЕДНИЕ \(days) ДНЕЙ"
+        chartTitle.stringValue = tr("WORDS PER DAY — LAST \(days) DAYS", "СЛОВ ПО ДНЯМ — ПОСЛЕДНИЕ \(days) ДНЕЙ")
         chart.data = DictationStats.daily(all, days: days, now: now)
 
         fill(appsList, st.apps.prefix(6).map { ($0.name, $0.words) }, total: st.words)
-        let langName = ["ru": "Русский", "en": "Английский"]
+        let langName = ["ru": tr("Russian", "Русский"), "en": tr("English", "Английский")]
         fill(langsList, st.langs.map { (langName[$0.code] ?? $0.code, $0.words) }, total: st.words)
 
         let streak = DictationStats.streak(all, now: now)
-        streakLabel.stringValue = streak > 0 ? "🔥 \(streak) \(Self.plural(streak, "день", "дня", "дней")) подряд с диктовкой" : ""
+        streakLabel.stringValue = streak > 0
+            ? tr("🔥 \(streak)-day dictation streak", "🔥 \(streak) \(L10n.plural(streak, en: ("day", "days"), ru: ("день", "дня", "дней"))) подряд с диктовкой")
+            : ""
     }
 
     private func fill(_ list: NSStackView, _ rows: [(String, Int)], total: Int) {
         list.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if rows.isEmpty {
-            let e = NSTextField(labelWithString: "Нет данных за период")
+            let e = NSTextField(labelWithString: tr("No data for this period", "Нет данных за период"))
             e.textColor = .tertiaryLabelColor
             list.addArrangedSubview(e)
             return
         }
         for (name, words) in rows {
-            let row = ShareRow(name: name, detail: "\(Self.num(words)) сл.", share: total > 0 ? Double(words) / Double(total) : 0)
+            let row = ShareRow(name: name, detail: "\(Self.num(words)) \(L10n.plural(words, en: ("word", "words"), ru: ("сл.", "сл.", "сл.")))", share: total > 0 ? Double(words) / Double(total) : 0)
             list.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: list.widthAnchor).isActive = true
         }
@@ -191,19 +198,22 @@ final class StatsPane: NSObject {
 
     // MARK: formatting
 
-    private static let numFmt: NumberFormatter = {
-        let f = NumberFormatter(); f.numberStyle = .decimal; f.locale = Locale(identifier: "ru_RU"); return f
-    }()
-    static func num(_ n: Int) -> String { numFmt.string(from: NSNumber(value: n)) ?? "\(n)" }
+    private static let numFmtRU = makeNumFmt("ru_RU")
+    private static let numFmtEN = makeNumFmt("en_US")
+    private static func makeNumFmt(_ id: String) -> NumberFormatter {
+        let f = NumberFormatter(); f.numberStyle = .decimal; f.locale = Locale(identifier: id); return f
+    }
+    static func num(_ n: Int) -> String { (L10n.isRussian ? numFmtRU : numFmtEN).string(from: NSNumber(value: n)) ?? "\(n)" }
 
     static func duration(_ s: Double) -> String {
         let t = Int(s.rounded())
-        if t < 60 { return "\(t) с" }
+        if t < 60 { return tr("\(t) s", "\(t) с") }
         let m = t / 60
-        if m < 60 { return "\(m) мин" }
-        return "\(m / 60) ч \(m % 60) мин"
+        if m < 60 { return tr("\(m) min", "\(m) мин") }
+        return tr("\(m / 60) h \(m % 60) min", "\(m / 60) ч \(m % 60) мин")
     }
 
+    /// Russian-only noun form for a count; UI code should prefer `L10n.plural`.
     static func plural(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {
         let n10 = n % 10, n100 = n % 100
         if n10 == 1 && n100 != 11 { return one }
@@ -246,7 +256,7 @@ final class StatCard: NSView {
     override var wantsUpdateLayer: Bool { true }
 }
 
-/// "Name ········ 1 234 сл." with a thin proportional bar underneath.
+/// "Name ········ 1,234 words  12%" with a thin proportional bar underneath.
 private final class ShareRow: NSView {
     private let share: Double
     init(name: String, detail: String, share: Double) {
@@ -284,10 +294,6 @@ private final class ShareRow: NSView {
 private final class BarChartView: NSView {
     var data: [(day: Date, words: Int)] = [] { didSet { needsDisplay = true } }
 
-    private static let dayFmt: DateFormatter = {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU"); f.dateFormat = "d MMM"; return f
-    }()
-
     override func draw(_ dirty: NSRect) {
         guard !data.isEmpty else { return }
         let labelH: CGFloat = 16, topPad: CGFloat = 16
@@ -298,6 +304,7 @@ private final class BarChartView: NSView {
         let small: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor]
         let cal = Calendar.current
         let labelEvery = data.count > 20 ? 5 : 2
+        let dayFmt = L10n.formatter(en: "MMM d", ru: "d MMM")
 
         for (i, d) in data.enumerated() {
             let x = CGFloat(i) * (barW + gap)
@@ -313,7 +320,7 @@ private final class BarChartView: NSView {
             }
             let fromEnd = data.count - 1 - i
             if fromEnd % labelEvery == 0 {
-                let s = NSAttributedString(string: isToday ? "сегодня" : Self.dayFmt.string(from: d.day), attributes: small)
+                let s = NSAttributedString(string: isToday ? tr("today", "сегодня") : dayFmt.string(from: d.day), attributes: small)
                 let lx = min(max(0, x + barW / 2 - s.size().width / 2), bounds.width - s.size().width)
                 s.draw(at: NSPoint(x: lx, y: 0))
             }

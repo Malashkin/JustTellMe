@@ -25,18 +25,19 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Vocabulary.swift` | Prompt, personal and built-in dictionary, replacement rules, casing of Latin terms |
 | `Learning.swift` | `CorrectionLearner` (word diff → rules + terms); `Paths` (data folder) |
 | `Paster.swift` | Clipboard round trip: lazy pasteboard promise, ⌘V, restore after the target app reads it; paste-again waits for ⌃⌥ to be released |
-| `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with «Скопировать» |
+| `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with a Copy button |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
-| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page), `ListEditor` («Новый список» / «Настроить…») |
-| `VoiceCommands.swift` | `SpokenKeyword` (a command word at the start, one letter off, split in two, lookalikes), `SavedCard` («Сохранено в «…»») |
-| `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Статистика page) |
+| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page), `ListEditor` (New List / Edit List…) |
+| `VoiceCommands.swift` | `SpokenKeyword` (a command word at the start, one letter off, split in two, lookalikes), `SavedCard` (“Saved to “…””) |
+| `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Statistics page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |
-| `SettingsPane.swift` | Настройки page; `SettingsHost` protocol implemented by `AppDelegate` |
-| `Windows.swift` | `VocabularyPane` (Словарь page), `CorrectionWindow` (fix and remember), `SelectableTextTableView` (text in the feed and notes can be selected with the mouse; ⌘C copies highlighted rows) |
+| `SettingsPane.swift` | Settings page; `SettingsHost` protocol implemented by `AppDelegate` |
+| `Windows.swift` | `VocabularyPane` (Dictionary page), `CorrectionWindow` (fix and remember), `SelectableTextTableView` (text in the feed and notes can be selected with the mouse; ⌘C copies highlighted rows) |
 | `Overlay.swift` | The recording pill; `WaveView` draws 18 CALayer bars at 30 fps |
 | `Settings.swift` | `Prefs`, CoreAudio helpers, `SystemMute`, `SecureInput` |
 | `Models.swift` | Bundled, imported and downloaded models; the active model |
+| `L10n.swift` | Interface language: `tr("English", "Русский")` pairs, `L10n.isRussian` (system language or `JTM_LANG`), `L10n.plural`, `L10n.formatter` ([ADR 011](decisions/011-interface-follows-system-language.md)) |
 
 ## Dictation pipeline
 
@@ -62,7 +63,7 @@ sequenceDiagram
     S->>W: transcribe remainder
     W-->>S: text (cleanup, replacements, casing)
     S-->>A: joined text + language
-    alt text starts with a voice list's command word («Заметка», «Задача», …)
+    alt text starts with a voice list's command word (“Note”, “Task”, … or «Заметка», «Задача» in Russian)
         A->>A: VoiceLists.addItem (rest of the phrase) → SavedCard, nothing pasted
     else
         A->>A: History.add
@@ -107,8 +108,8 @@ sequenceDiagram
     participant D as GitHub Releases
     U->>G: GET /repos/Malashkin/JustTellMe/releases/latest (daily)
     G-->>U: tag, notes, JustTellMe.zip URL
-    U->>U: newer than CFBundleShortVersionString? → menu + Главная
-    U->>D: download JustTellMe.zip (after «Установить»)
+    U->>U: newer than CFBundleShortVersionString? → menu + Home
+    U->>D: download JustTellMe.zip (after “Install…”)
     U->>U: ditto -x; same bundle id, same version as tag; codesign --verify; same certificate (designated requirement)
     U->>U: sh: wait for exit → swap the .app (roll back on failure) → open
 ```

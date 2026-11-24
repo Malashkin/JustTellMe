@@ -1,7 +1,7 @@
 ---
 audience: all
 owner: Malashkin
-updated: 2026-11-11
+updated: 2026-11-24
 ---
 
 # 008. Keep pauses inside a clip (cutting them out was rejected)
@@ -15,7 +15,7 @@ clip (keep ±0.25–1 s around each speech segment): less audio means a smaller 
 ## What was measured
 Five TTS clips with 2–4 s pauses, GPU, `--repeat 2`:
 - The encoder got ~2× faster (1.5 s vs 2.8 s) and two clips came out cleaner.
-- On two clips ending in a short phrase, whisper looped on that phrase («И третья. И третья. И треть»). It then
+- On two clips ending in a short phrase, whisper looped on that phrase («И третья. И третья. И треть», i.e. “And the third. And the third. And the thi”). It then
   fell back to temperature sampling 4 times: 7–11 s instead of ~3 s, once with garbage text.
 - Every tested margin (250/300, 400/600, 700/1300, 1000/1000 ms) and the full encoder window showed the same.
   Turning temperature fallback off left a broken tail that the repeat cleanup cannot fix.

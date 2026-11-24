@@ -15,11 +15,11 @@ enum FeatureTests {
         voiceNotes()
     }
 
-    // MARK: «Заметка …» saves a note instead of pasting
+    // MARK: Voice lists: a command word at the start saves the phrase to a list instead of pasting
 
     static func voiceNotes() {
         let defaults = VoiceLists.defaultLists()
-        /// The text saved to Заметки, or nil when the phrase is not a note.
+        /// The text saved to the notes list, or nil when the phrase is not a note.
         func note(_ s: String) -> String? {
             guard let m = VoiceLists.match(s, in: defaults), m.list.name == "Заметки" else { return nil }
             return m.body

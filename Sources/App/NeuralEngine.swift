@@ -101,7 +101,7 @@ final class NeuralEngine: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         if let http = downloadTask.response as? HTTPURLResponse, http.statusCode != 200 {
-            status = .failed(http.statusCode == 404 ? "для этой модели нет версии под Neural Engine" : "HTTP \(http.statusCode)")
+            status = .failed(http.statusCode == 404 ? tr("there is no Neural Engine version of this model", "для этой модели нет версии под Neural Engine") : "HTTP \(http.statusCode)")
             return
         }
         // The temp file disappears when this method returns: move it first, unpack in the background.
@@ -118,7 +118,7 @@ final class NeuralEngine: NSObject, URLSessionDownloadDelegate {
             try? FileManager.default.removeItem(at: zip)
             DispatchQueue.main.async {
                 let enc = Paths.models.appendingPathComponent(name)
-                guard ok, FileManager.default.fileExists(atPath: enc.path) else { self.status = .failed("не удалось распаковать"); return }
+                guard ok, FileManager.default.fileExists(atPath: enc.path) else { self.status = .failed(tr("couldn't unpack it", "не удалось распаковать")); return }
                 guard self.model.map(Self.encoderURL(for:)) == enc else { return }
                 self.prepare(enc)
             }

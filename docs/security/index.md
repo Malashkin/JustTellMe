@@ -14,8 +14,8 @@ Recognition runs locally (whisper.cpp). The app goes to the network only for:
 - a model or the Neural Engine encoder you chose to download, from `huggingface.co/ggerganov/whisper.cpp`;
 - the update check, at most once a day: `GET api.github.com/repos/Malashkin/JustTellMe/releases/latest` (or, when
   the API limit is used up, `HEAD github.com/Malashkin/JustTellMe/releases/latest`) with `User-Agent: JustTellMe/<version>`.
-  Nothing else is sent. Turn it off in Настройки → Обновления (`checkUpdates`);
-- downloading an update, after you click «Установить».
+  Nothing else is sent. Turn it off in Settings → Updates (`checkUpdates`);
+- downloading an update, after you click “Install…”.
 
 No telemetry, no accounts. Audio and text never leave the Mac.
 
@@ -31,12 +31,12 @@ it is refused with the reason. See [ADR 007](../architecture/decisions/007-updat
 
 | File | Contents | Removed by |
 |---|---|---|
-| `lists.json`, `list-<id>.json` | Voice lists (name, command words, kind) and their entries: text, time, language; for tasks status, done time, deadline (max 5000 per list) | «Удалить» in a list; «Настроить…» → «Удалить список…» |
-| `notes.json` | Notes from earlier builds of this branch; copied into Заметки on the first start and no longer used | Delete the file |
-| `history.json` | Every dictation: text, time, language, app, length (max 2000) | «Очистить всё…» / «Удалить» on Главная |
-| `dictionary.txt`, `replacements.txt` | Personal terms and fixes | Словарь page |
-| `prompt.txt` | Custom prompt (only if changed) | «Подсказка по умолчанию» |
-| `Models/` | Downloaded models and Core ML encoders | Finder (🎙 → Модель → «Открыть папку моделей») |
+| `lists.json`, `list-<id>.json` | Voice lists (name, command words, kind) and their entries: text, time, language; for tasks status, done time, deadline (max 5000 per list) | Delete in a list; Edit List… → Delete List… |
+| `notes.json` | Notes from earlier builds of this branch; copied into the first default list (Notes / Заметки) on the first start and no longer used | Delete the file |
+| `history.json` | Every dictation: text, time, language, app, length (max 2000) | Clear All… / Delete on Home |
+| `dictionary.txt`, `replacements.txt` | Personal terms and fixes | Dictionary page |
+| `prompt.txt` | Custom prompt (only if changed) | Default Prompt |
+| `Models/` | Downloaded models and Core ML encoders | Finder (🎙 → Model → Open Models Folder) |
 
 Settings are in `UserDefaults` (`com.justtellme.app`). Logs contain timings and errors, **never the dictated text**.
 
@@ -45,7 +45,7 @@ Settings are in `UserDefaults` (`com.justtellme.app`). Logs contain timings and 
 | Permission | Why |
 |---|---|
 | Microphone | Recording while you dictate |
-| Accessibility | Listening for the dictation key (listen-only event tap), sending ⌘V to paste, and asking the frontmost app for the **role** of its focused element after pasting (to show «Курсор не в поле ввода?»). The content of fields is never read. |
+| Accessibility | Listening for the dictation key (listen-only event tap), sending ⌘V to paste, and asking the frontmost app for the **role** of its focused element after pasting (to show the “No text field?” card). The content of fields is never read. |
 | Login Items (optional) | Launch at login |
 
 ⌃⌥V (paste again) is a Carbon hotkey and needs no permission.

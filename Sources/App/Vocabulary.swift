@@ -13,13 +13,23 @@ final class Vocabulary {
     /// Generic priming sentence: tells whisper that English terms appear in Latin inside Russian text.
     static let defaultPrompt = "Привет! Это диктовка на русском, где English words пишутся латиницей: deploy, pull request, feedback."
 
-    static let dictionaryHeader = "# Личный словарь JustTellMe: по одному термину/имени на строку. Строки с # игнорируются.\n"
-    static let replacementsHeader = """
-    # Личные замены JustTellMe: «неправильно => правильно», по одной на строку (регистр не важен).
-    # Пример:
-    # пул реквест => pull request
+    static var dictionaryHeader: String {
+        tr("# JustTellMe personal dictionary: one term or name per line. Lines starting with # are ignored.\n",
+           "# Личный словарь JustTellMe: по одному термину/имени на строку. Строки с # игнорируются.\n")
+    }
+    static var replacementsHeader: String {
+        tr("""
+        # JustTellMe personal replacements: "wrong => right", one per line (case-insensitive).
+        # Example:
+        # pull requst => pull request
 
-    """
+        """, """
+        # Личные замены JustTellMe: «неправильно => правильно», по одной на строку (регистр не важен).
+        # Пример:
+        # пул реквест => pull request
+
+        """)
+    }
 
     typealias Rule = (from: String, to: String, regex: NSRegularExpression)
 
@@ -94,7 +104,7 @@ final class Vocabulary {
         return nil
     }
 
-    /// Longest patterns first, so "ю эс би си" wins over "ю эс би".
+    /// Longest patterns first, so "ю эс би си" (spoken "USB-C") wins over "ю эс би" ("USB").
     static func rules(from lines: [String]) -> [Rule] {
         lines.compactMap(parseRule)
             .compactMap { p in makeRegex(p.0).map { (p.0, p.1, $0) } }

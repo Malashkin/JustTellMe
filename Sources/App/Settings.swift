@@ -8,9 +8,9 @@ enum Prefs {
         case holdOrDoubleTap, holdOrTap, holdOnly
         var title: String {
             switch self {
-            case .holdOrDoubleTap: return "Удерживать или нажать дважды (двойное нажатие — без рук)"
-            case .holdOrTap: return "Удерживать или нажать один раз (короткое нажатие — без рук)"
-            case .holdOnly: return "Только удерживать"
+            case .holdOrDoubleTap: return tr("Hold, or double-tap (double tap: hands-free)", "Удерживать или нажать дважды (двойное нажатие — без рук)")
+            case .holdOrTap: return tr("Hold, or tap once (short tap: hands-free)", "Удерживать или нажать один раз (короткое нажатие — без рук)")
+            case .holdOnly: return tr("Hold only", "Только удерживать")
             }
         }
     }

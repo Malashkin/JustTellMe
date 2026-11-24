@@ -20,7 +20,7 @@ protocol SettingsHost: AnyObject {
     func checkForUpdatesNow()
 }
 
-/// "Настройки" page of the main window. Mirrors the Настройки submenu of the menu-bar icon.
+/// Settings page of the main window. Mirrors the Settings submenu of the menu-bar icon.
 final class SettingsPane: NSObject {
     weak var host: SettingsHost?
 
@@ -31,19 +31,27 @@ final class SettingsPane: NSObject {
     private let micPopup = NSPopUpButton()
     private let modelPopup = NSPopUpButton()
     private let unloadPopup = NSPopUpButton()
-    private let neuralBox = NSButton(checkboxWithTitle: "Ускорение Neural Engine", target: nil, action: nil)
+    private let neuralBox = NSButton(checkboxWithTitle: tr("Neural Engine Acceleration", "Ускорение Neural Engine"), target: nil, action: nil)
     private let neuralStatus = NSTextField(wrappingLabelWithString: "")
-    private let neuralRetry = NSButton(title: "Повторить", target: nil, action: nil)
-    private let soundsBox = NSButton(checkboxWithTitle: "Звуки начала и конца записи", target: nil, action: nil)
-    private let muteBox = NSButton(checkboxWithTitle: "Приглушать звук компьютера во время диктовки", target: nil, action: nil)
-    private let clipBox = NSButton(checkboxWithTitle: "Возвращать прежний буфер обмена после вставки", target: nil, action: nil)
-    private let loginBox = NSButton(checkboxWithTitle: "Запускать JustTellMe при входе в систему", target: nil, action: nil)
-    private let updatesBox = NSButton(checkboxWithTitle: "Проверять обновления раз в день", target: nil, action: nil)
-    private let checkNow = NSButton(title: "Проверить сейчас", target: nil, action: nil)
+    private let neuralRetry = NSButton(title: tr("Retry", "Повторить"), target: nil, action: nil)
+    private let soundsBox = NSButton(checkboxWithTitle: tr("Play sounds when recording starts and stops", "Звуки начала и конца записи"), target: nil, action: nil)
+    private let muteBox = NSButton(checkboxWithTitle: tr("Mute computer audio while dictating", "Приглушать звук компьютера во время диктовки"), target: nil, action: nil)
+    private let clipBox = NSButton(checkboxWithTitle: tr("Restore previous clipboard after pasting", "Возвращать прежний буфер обмена после вставки"), target: nil, action: nil)
+    private let loginBox = NSButton(checkboxWithTitle: tr("Open JustTellMe at login", "Запускать JustTellMe при входе в систему"), target: nil, action: nil)
+    private let updatesBox = NSButton(checkboxWithTitle: tr("Check for updates daily", "Проверять обновления раз в день"), target: nil, action: nil)
+    private let checkNow = NSButton(title: tr("Check Now", "Проверить сейчас"), target: nil, action: nil)
     private let updateStatus = NSTextField(labelWithString: "")
 
-    private static let languages = [("auto", "Авто (ru/en, с уклоном в ru)"), ("ru", "Русский"), ("en", "English")]
-    static let unloadOptions = [(0, "Никогда (держать в памяти ~0,7 ГБ)"), (5, "Через 5 минут простоя"), (15, "Через 15 минут простоя (рекомендуется)"), (60, "Через час простоя")]
+    private static var languages: [(String, String)] {
+        [("auto", tr("Auto (Russian/English, prefers Russian)", "Авто (ru/en, с уклоном в ru)")),
+         ("ru", tr("Russian", "Русский")), ("en", "English")]
+    }
+    static var unloadOptions: [(Int, String)] {
+        [(0, tr("Never (keep in memory, ~0.7 GB)", "Никогда (держать в памяти ~0,7 ГБ)")),
+         (5, tr("After 5 minutes idle", "Через 5 минут простоя")),
+         (15, tr("After 15 minutes idle (recommended)", "Через 15 минут простоя (рекомендуется)")),
+         (60, tr("After 1 hour idle", "Через час простоя"))]
+    }
 
     private func build() -> NSView {
         for (p, sel) in [(keyPopup, #selector(keyChanged)), (triggerPopup, #selector(triggerChanged)), (langPopup, #selector(langChanged)),
@@ -63,27 +71,28 @@ final class SettingsPane: NSObject {
         unloadPopup.addItems(withTitles: Self.unloadOptions.map(\.1))
         neuralStatus.textColor = .secondaryLabelColor
         neuralStatus.font = .systemFont(ofSize: 11)
-        clipBox.toolTip = "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена."
-        let addModel = NSButton(title: "Добавить из файла…", target: self, action: #selector(addModel))
+        clipBox.toolTip = tr("When off, the dictated text stays on the clipboard. While this is on, clipboard managers (Maccy, Raycast, Paste) don't save dictated text.",
+                             "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена.")
+        let addModel = NSButton(title: tr("Add from File…", "Добавить из файла…"), target: self, action: #selector(addModel))
 
         let grid = NSGridView(views: [
-            [caption("Клавиша диктовки"), keyPopup],
-            [caption("Как работает клавиша"), triggerPopup],
-            [NSGridCell.emptyContentView, note("Esc — отменить запись или распознавание.")],
-            [caption("Язык"), langPopup],
-            [caption("Микрофон"), micPopup],
-            [caption("Модель"), NSStackView(views: [modelPopup, addModel])],
-            [NSGridCell.emptyContentView, note("Скачать другие модели — в меню значка 🎙 → Модель.")],
-            [caption("Ускорение"), NSStackView(views: [neuralBox, neuralRetry])],
+            [caption(tr("Dictation key", "Клавиша диктовки")), keyPopup],
+            [caption(tr("How the key works", "Как работает клавиша")), triggerPopup],
+            [NSGridCell.emptyContentView, note(tr("Esc cancels recording or transcription.", "Esc — отменить запись или распознавание."))],
+            [caption(tr("Language", "Язык")), langPopup],
+            [caption(tr("Microphone", "Микрофон")), micPopup],
+            [caption(tr("Model", "Модель")), NSStackView(views: [modelPopup, addModel])],
+            [NSGridCell.emptyContentView, note(tr("To download other models, use the 🎙 menu → Model.", "Скачать другие модели — в меню значка 🎙 → Модель."))],
+            [caption(tr("Acceleration", "Ускорение")), NSStackView(views: [neuralBox, neuralRetry])],
             [NSGridCell.emptyContentView, neuralStatus],
-            [caption("Выгружать модель из памяти"), unloadPopup],
-            [NSGridCell.emptyContentView, note("Модель загружается заново, пока вы говорите: на видеокарте это меньше секунды.")],
-            [caption("Звук и вставка"), soundsBox],
+            [caption(tr("Unload model from memory", "Выгружать модель из памяти")), unloadPopup],
+            [NSGridCell.emptyContentView, note(tr("The model reloads while you speak; on the GPU this takes under a second.", "Модель загружается заново, пока вы говорите: на видеокарте это меньше секунды."))],
+            [caption(tr("Sound and pasting", "Звук и вставка")), soundsBox],
             [NSGridCell.emptyContentView, muteBox],
             [NSGridCell.emptyContentView, clipBox],
-            [NSGridCell.emptyContentView, note("⌃⌥V — вставить последнее надиктованное ещё раз.")],
-            [caption("Запуск"), loginBox],
-            [caption("Обновления"), NSStackView(views: [updatesBox, checkNow])],
+            [NSGridCell.emptyContentView, note(tr("⌃⌥V pastes the last dictation again.", "⌃⌥V — вставить последнее надиктованное ещё раз."))],
+            [caption(tr("Startup", "Запуск")), loginBox],
+            [caption(tr("Updates", "Обновления")), NSStackView(views: [updatesBox, checkNow])],
             [NSGridCell.emptyContentView, updateStatus],
         ])
         grid.rowSpacing = 10
@@ -136,7 +145,7 @@ final class SettingsPane: NSObject {
         if micPopup.menu?.highlightedItem == nil {
             micPopup.removeAllItems()
             let sysName = AudioDevices.defaultDevice(input: true).flatMap(AudioDevices.name(of:)) ?? "—"
-            micPopup.addItem(withTitle: "Как в системе (\(sysName))")
+            micPopup.addItem(withTitle: tr("System Default (\(sysName))", "Как в системе (\(sysName))"))
             micPopup.lastItem?.representedObject = nil
             let devices = AudioDevices.inputs()
             for d in devices {
@@ -150,7 +159,7 @@ final class SettingsPane: NSObject {
             modelPopup.removeAllItems()
             let active = host?.loadedModelPath ?? ModelManager.active()?.url.path
             for info in ModelManager.available() {
-                modelPopup.addItem(withTitle: "\(info.name)  (\(info.sizeMB) МБ\(info.bundled ? ", встроенная" : ""))")
+                modelPopup.addItem(withTitle: "\(info.name)  (\(info.sizeMB) \(tr("MB", "МБ"))\(info.bundled ? tr(", built-in", ", встроенная") : ""))")
                 modelPopup.lastItem?.representedObject = info.url.path
                 if info.url.path == active { modelPopup.select(modelPopup.lastItem) }
             }
@@ -158,14 +167,15 @@ final class SettingsPane: NSObject {
 
         neuralBox.state = Prefs.neuralEngine ? .on : .off
         neuralStatus.stringValue = Prefs.neuralEngine ? (host?.neuralStatusText ?? "")
-            : "Тяжёлая часть Whisper считается на Neural Engine — примерно в 5 раз быстрее на M1. Нужно скачать 1,2 ГБ, затем macOS один раз готовит модель (до ~30 минут), пока диктовка работает как обычно."
+            : tr("Runs the heavy part of Whisper on the Neural Engine, about 5 times faster on M1. Requires a 1.2 GB download, then macOS prepares the model once (up to ~30 minutes) while dictation keeps working as usual.",
+                 "Тяжёлая часть Whisper считается на Neural Engine — примерно в 5 раз быстрее на M1. Нужно скачать 1,2 ГБ, затем macOS один раз готовит модель (до ~30 минут), пока диктовка работает как обычно.")
         neuralRetry.isHidden = host?.neuralFailed != true
         soundsBox.state = Prefs.sounds ? .on : .off
         muteBox.state = Prefs.muteWhileRecording ? .on : .off
         clipBox.state = Prefs.restoreClipboard ? .on : .off
         loginBox.state = host?.launchAtLogin == true ? .on : .off
         updatesBox.state = Prefs.checkUpdates ? .on : .off
-        updateStatus.stringValue = host?.updateStatusText ?? "Установлена версия \(Updater.currentVersion)."
+        updateStatus.stringValue = host?.updateStatusText ?? tr("Version \(Updater.currentVersion) installed.", "Установлена версия \(Updater.currentVersion).")
     }
 
     @objc private func keyChanged() { host?.setHotkey(PushToTalkHotkey.Key.allCases[keyPopup.indexOfSelectedItem]) }

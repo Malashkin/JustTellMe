@@ -1,12 +1,13 @@
 ---
 audience: product
 owner: Malashkin
-updated: 2026-11-12
+updated: 2026-11-24
 ---
 
 # Settings
 
-Every setting is on the **Настройки** page of the main window and in the 🎙 → «Настройки» submenu.
+Every setting is on the **Settings** page of the main window and in the 🎙 → Settings submenu.
+The interface language is not a setting: it follows macOS (see [features.md](features.md#interface-language)).
 Values are stored in `UserDefaults` (domain `com.justtellme.app`). Read them with `defaults read com.justtellme.app`.
 
 | Setting | Key | Default | Notes |
@@ -25,4 +26,4 @@ Values are stored in `UserDefaults` (domain `com.justtellme.app`). Read them wit
 | Launch at login | (SMAppService) | off | May need approval in System Settings → Login Items |
 | Check for updates daily | `checkUpdates` | on | Asks api.github.com for the latest release; `lastUpdateCheck` holds the time of the last check |
 
-Internal keys: `statsPeriod` (last period chosen on Статистика) and `welcomeShown` (whether the window has opened on first launch).
+Internal keys: `statsPeriod` (last period chosen on Statistics) and `welcomeShown` (whether the window has opened on first launch).

@@ -216,25 +216,27 @@ if args.contains("--focus-check") {
     exit(0)
 }
 
-//   JustTellMe --demo-card out.png   (renders the «Курсор не в поле ввода?» card)
+//   JustTellMe --demo-card out.png   (renders the "No text field?" card)
 if let out = opt("--demo-card") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.appearance = NSAppearance(named: .aqua)
     let c = NoFieldCard()
-    c.show("Созвон перенесли на четверг, в 15:00. Захвати, пожалуйста, ноутбук и отчёт по продажам за октябрь.")
+    c.show(tr("The call moved to Thursday at 3 PM. Please bring the laptop and the October sales report.",
+               "Созвон перенесли на четверг, в 15:00. Захвати, пожалуйста, ноутбук и отчёт по продажам за октябрь."))
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
     app.run()
 }
 
-//   JustTellMe --demo-note-card out.png   (renders the «Сохранено в «Заметки»» card)
+//   JustTellMe --demo-note-card out.png   (renders the "Saved to Notes" card)
 if let out = opt("--demo-note-card") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     app.appearance = NSAppearance(named: .aqua)
     let c = SavedCard()
-    c.show("Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте.",
-           title: "Сохранено в «Заметки»", button: "Открыть «Заметки»")
+    c.show(tr("Buy milk and call the bank about the card before Friday, and pick up the parcel at the post office.",
+              "Купить молоко и позвонить в банк насчёт карты до пятницы, а ещё забрать посылку на почте."),
+           title: tr("Saved to “Notes”", "Сохранено в «Заметки»"), button: tr("Open “Notes”", "Открыть «Заметки»"))
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { c.snapshot(to: URL(fileURLWithPath: out)); exit(0) }
     app.run()
 }

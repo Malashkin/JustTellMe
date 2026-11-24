@@ -84,7 +84,7 @@ struct SpokenKeyword {
     }
 }
 
-// MARK: - «Сохранено в «Заметки»» card: confirms that nothing was pasted and where the text went
+// MARK: - "Saved to “Notes”" card: confirms that nothing was pasted and where the text went
 
 final class SavedCard: NSObject {
     var onOpen: (() -> Void)?

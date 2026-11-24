@@ -1,0 +1,2 @@
+/* Microphone permission prompt. */
+"NSMicrophoneUsageDescription" = "JustTellMe записывает голос, пока вы диктуете (удерживаете клавишу диктовки), и распознаёт его локально на этом Mac.";

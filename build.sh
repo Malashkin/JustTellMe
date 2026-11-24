@@ -117,6 +117,8 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$MODEL" "$APP/Contents/Resources/$MODEL_NAME"
 cp "$VAD" "$APP/Contents/Resources/ggml-silero-v6.2.0.vad"
 cp "$ROOT/Resources/builtin_terms.txt" "$ROOT/Resources/builtin_replacements.txt" "$APP/Contents/Resources/"
+# System texts (the microphone prompt) in English and Russian; the app's own texts are in the code (L10n.swift).
+cp -R "$ROOT/Resources/en.lproj" "$ROOT/Resources/ru.lproj" "$APP/Contents/Resources/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # 6. Sign. A stable local identity keeps macOS permissions (Accessibility, Microphone) across rebuilds;
