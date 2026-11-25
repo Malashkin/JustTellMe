@@ -10,6 +10,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Fixed
+- The theme switch icons are level and the chosen segment stays inside the capsule (capsule buttons no longer inherit the bezel insets).
+
 ### Changed
 - **Liquid Glass design.** The main window is now glass: the desktop shows through a blurred window with no title bar, the sidebar is a floating glass panel with a capsule for the chosen page, lists and the Home feed sit on glass cards, and buttons, search fields, filters and the status of a task are capsules. The task status is a capsule that opens a Backlog / Done menu; the list buttons (Done, To Backlog, Due Date…, Check All, Delete) are one glass bar under the list. Every page has a large title. The recording pill, the “Saved to …” card and the “No text field?” card are glass too and follow Light/Dark mode. Built from `NSVisualEffectView` and layers, so it works on macOS 13+ and respects “Reduce transparency” ([ADR 012](architecture/decisions/012-liquid-glass-design.md)).
 - **Toy-brick palette, no red.** The interface uses bright blue, yellow, green and orange (`Brick` in `Glass.swift`). The main action is tinted blue glass instead of a solid blue slab; Delete, Clear All and overdue dates are orange; Done is green; the recording dot and the menu-bar mic while recording are orange, transcribing is blue; the statistics chart is blue with today in orange.

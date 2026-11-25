@@ -89,6 +89,17 @@ enum GlassTests {
             T.ok(buttons.allSatisfy { $0.image != nil && $0.toolTip != nil }, "icons and tooltips")
             T.eq(buttons[0].intrinsicContentSize.width, 40)
         }
+        T.test("theme: icon segments are level and stay inside the capsule") {
+            let s = CapsuleSegments(["Auto", "Light", "Dark"], symbols: ["circle.lefthalf.filled", "sun.max", "moon"])
+            s.frame.size = s.fittingSize
+            s.layoutSubtreeIfNeeded()
+            let buttons = s.subviews.flatMap(\.subviews).compactMap { $0 as? CapsuleButton }
+            let frames = buttons.map { s.convert($0.bounds, from: $0) }
+            T.ok(frames.allSatisfy { s.bounds.insetBy(dx: 2, dy: 2).contains($0) }, "segments inside the capsule: \(frames) in \(s.bounds)")
+            T.ok(Set(frames.map { Int($0.width) }).count == 1, "equal widths \(frames.map(\.width))")
+            T.ok(Set(frames.map { Int($0.midY) }).count == 1, "same centre line \(frames.map(\.midY))")
+            T.ok(Set(buttons.map { Int($0.image!.size.height) }).count == 1, "icons of one height \(buttons.map { $0.image!.size })")
+        }
         T.test("window buttons sit inside the sidebar panel") {
             let inset = MainWindow.windowButtonsInset
             let panel = NSRect(x: 10, y: 10, width: 210, height: 600)   // sidebar panel, from the top-left
