@@ -133,7 +133,7 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-window out-prefix [--ok] [--dark]   (renders every page of the main window with the real history, for checking the layout)
+//   JustTellMe --demo-window out-prefix [--ok] [--dark] [--select]   (renders every page of the main window with the real history, for checking the layout)
 if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
@@ -148,6 +148,7 @@ if let out = opt("--demo-window") {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
         w.present(p)
+        if args.contains("--select") { w.demoSelectFirstEntry() }
         DispatchQueue.main.asyncAfter(deadline: .now() + (Double(ProcessInfo.processInfo.environment["JTM_DEMO_DELAY"] ?? "") ?? 0.8)) {
             w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
             n += 1

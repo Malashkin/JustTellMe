@@ -341,6 +341,17 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
 
     /// Render the window content to PNG (used by --demo-window). The blurred desktop can't be captured
     /// this way, so the glass is drawn over a soft sample wallpaper instead.
+    /// Demo: select the first entry of the page's list, to check the row highlight.
+    func demoSelectFirstEntry() {
+        func tables(_ v: NSView) -> [NSTableView] { (v as? NSTableView).map { [$0] } ?? v.subviews.flatMap(tables) }
+        for t in tables(content) {
+            let delegate = t.delegate
+            if let row = (0..<t.numberOfRows).first(where: { delegate?.tableView?(t, isGroupRow: $0) != true }) {
+                t.selectRowIndexes([row], byExtendingSelection: false)
+            }
+        }
+    }
+
     func snapshot(to url: URL) {
         guard let v = window?.contentView else { return }
         if let n = window?.windowNumber { FileHandle.standardError.write("window \(n)\n".data(using: .utf8)!) }
@@ -412,7 +423,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         let feedHead = NSStackView(views: [feedTitle, NSView(), more, Glass.searchCapsule(search, width: 240)])
         feedHead.spacing = 12
 
-        for (id, width) in [("time", 48.0), ("text", 600.0)] {
+        for (id, width) in [("time", 48.0 + ListPane.rowPad), ("text", 600.0)] {
             let c = NSTableColumn(identifier: .init(id))
             c.width = width
             if id == "text" { c.resizingMask = .autoresizingMask } else { c.resizingMask = [] }
@@ -630,7 +641,8 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             }
         }
         NSLayoutConstraint.activate([
-            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            // Room between the row highlight capsule and the time / day header, as in the lists.
+            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: col?.identifier.rawValue == "text" ? 2 : ListPane.rowPad + 2),
             t.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
             t.topAnchor.constraint(equalTo: cell.topAnchor, constant: top),
             t.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -6),

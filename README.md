@@ -216,7 +216,7 @@ The binary `JustTellMe.app/Contents/MacOS/JustTellMe` accepts hidden flags:
 - `--audio-info [--test-mute]`
 - `--demo-paste "text"`
 - `--demo-overlay [out.png] [--dark]`: shows the recording pill and prints its window number for `screencapture -l`
-- `--demo-window out-prefix [--ok] [--dark]`: PNGs of every page of the main window
+- `--demo-window out-prefix [--ok] [--dark] [--select]`: PNGs of every page of the main window (`--select` highlights the first entry)
 - `--demo-card out.png`
 - `--demo-note-card out.png`
 - `--unload-cycle file.wav`

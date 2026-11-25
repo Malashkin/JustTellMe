@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 ## [Unreleased]
 
 ### Fixed
+- Lists and the Home feed: the checkbox, time and day headers no longer touch the edge of the row highlight.
+- Statistics and Settings use the glass controls too: the period switch is a glass capsule, pop-up menus and buttons are glass capsules, and the right margin matches the other pages.
 - The theme switch icons are level and the chosen segment stays inside the capsule (capsule buttons no longer inherit the bezel insets).
 
 ### Changed

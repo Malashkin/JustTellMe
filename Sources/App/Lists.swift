@@ -547,8 +547,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
 
     /// Columns depend on the kind, which can be changed in "Edit List…".
     private func rebuildColumns() {
-        let ids = kind == .tasks ? [("check", 22.0), ("status", 86.0), ("time", 104.0), ("text", 480.0)]
-                                 : [("check", 22.0), ("time", 104.0), ("text", 540.0)]
+        let ids = kind == .tasks ? [("check", 22.0 + ListPane.rowPad), ("status", 86.0), ("time", 104.0), ("text", 480.0)]
+                                 : [("check", 22.0 + ListPane.rowPad), ("time", 104.0), ("text", 540.0)]
         guard table.tableColumns.map(\.identifier.rawValue) != ids.map(\.0) else { return }
         table.tableColumns.forEach { table.removeTableColumn($0) }
         for (id, width) in ids {
@@ -758,6 +758,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     /// Top inset of the entry text in its cell.
     private static let textTop: CGFloat = 6
     /// Height of one line of entry text: controls in front of an entry are centred on it.
+    /// Room between the row highlight capsule and the checkbox / day header.
+    static let rowPad: CGFloat = 10
     static let firstLineHeight: CGFloat = {
         let probe = NSTextField(labelWithString: "Ag")
         probe.font = textFont
@@ -804,7 +806,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             control.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(control)
             NSLayoutConstraint.activate([
-                control.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                control.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: id == "check" ? Self.rowPad : 0),
                 // The checkbox and the status capsule are centred on the first line of the entry text.
                 control.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: Self.textTop + Self.firstLineHeight / 2),
             ])
@@ -817,12 +819,14 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         cell.addSubview(t)
         cell.textField = t
         var top: CGFloat = Self.textTop
+        var lead: CGFloat = 2
         switch rows[row] {
         case .day(let name):
             t.stringValue = name
             t.font = .systemFont(ofSize: 12, weight: .semibold)
             t.textColor = .secondaryLabelColor
             top = 14
+            lead = Self.rowPad + 2
         case .item(let i):
             if id == "time" {
                 t.stringValue = ListFilter.stamp(i.date)
@@ -835,7 +839,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             }
         }
         NSLayoutConstraint.activate([
-            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: lead),
             t.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
             t.topAnchor.constraint(equalTo: cell.topAnchor, constant: top),
             t.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -6),

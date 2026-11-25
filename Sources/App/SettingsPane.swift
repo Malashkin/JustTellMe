@@ -33,13 +33,13 @@ final class SettingsPane: NSObject {
     private let unloadPopup = NSPopUpButton()
     private let neuralBox = NSButton(checkboxWithTitle: tr("Neural Engine Acceleration", "Ускорение Neural Engine"), target: nil, action: nil)
     private let neuralStatus = NSTextField(wrappingLabelWithString: "")
-    private let neuralRetry = NSButton(title: tr("Retry", "Повторить"), target: nil, action: nil)
+    private let neuralRetry = CapsuleButton(tr("Retry", "Повторить"), style: .glass)
     private let soundsBox = NSButton(checkboxWithTitle: tr("Play sounds when recording starts and stops", "Звуки начала и конца записи"), target: nil, action: nil)
     private let muteBox = NSButton(checkboxWithTitle: tr("Mute computer audio while dictating", "Приглушать звук компьютера во время диктовки"), target: nil, action: nil)
     private let clipBox = NSButton(checkboxWithTitle: tr("Restore previous clipboard after pasting", "Возвращать прежний буфер обмена после вставки"), target: nil, action: nil)
     private let loginBox = NSButton(checkboxWithTitle: tr("Open JustTellMe at login", "Запускать JustTellMe при входе в систему"), target: nil, action: nil)
     private let updatesBox = NSButton(checkboxWithTitle: tr("Check for updates daily", "Проверять обновления раз в день"), target: nil, action: nil)
-    private let checkNow = NSButton(title: tr("Check Now", "Проверить сейчас"), target: nil, action: nil)
+    private let checkNow = CapsuleButton(tr("Check Now", "Проверить сейчас"), style: .glass)
     private let updateStatus = NSTextField(labelWithString: "")
     private let themeControl = CapsuleSegments(Prefs.Theme.allCases.map(\.title))
 
@@ -74,21 +74,21 @@ final class SettingsPane: NSObject {
         neuralStatus.font = .systemFont(ofSize: 11)
         clipBox.toolTip = tr("When off, the dictated text stays on the clipboard. While this is on, clipboard managers (Maccy, Raycast, Paste) don't save dictated text.",
                              "Если выключить, надиктованный текст останется в буфере обмена. Менеджеры буфера (Maccy, Raycast, Paste) надиктованное не сохраняют, пока эта опция включена.")
-        let addModel = NSButton(title: tr("Add from File…", "Добавить из файла…"), target: self, action: #selector(addModel))
+        let addModel = CapsuleButton(tr("Add from File…", "Добавить из файла…"), style: .glass, target: self, action: #selector(addModel))
 
         themeControl.onChange = { Prefs.theme = Prefs.Theme.allCases[$0] }
         let grid = NSGridView(views: [
             [caption(tr("Appearance", "Оформление")), themeControl],
-            [caption(tr("Dictation key", "Клавиша диктовки")), keyPopup],
-            [caption(tr("How the key works", "Как работает клавиша")), triggerPopup],
+            [caption(tr("Dictation key", "Клавиша диктовки")), glassPopup(keyPopup)],
+            [caption(tr("How the key works", "Как работает клавиша")), glassPopup(triggerPopup)],
             [NSGridCell.emptyContentView, note(tr("Esc cancels recording or transcription.", "Esc — отменить запись или распознавание."))],
-            [caption(tr("Language", "Язык")), langPopup],
-            [caption(tr("Microphone", "Микрофон")), micPopup],
-            [caption(tr("Model", "Модель")), NSStackView(views: [modelPopup, addModel])],
+            [caption(tr("Language", "Язык")), glassPopup(langPopup)],
+            [caption(tr("Microphone", "Микрофон")), glassPopup(micPopup)],
+            [caption(tr("Model", "Модель")), NSStackView(views: [glassPopup(modelPopup), addModel])],
             [NSGridCell.emptyContentView, note(tr("To download other models, use the 🎙 menu → Model.", "Скачать другие модели — в меню значка 🎙 → Модель."))],
             [caption(tr("Acceleration", "Ускорение")), NSStackView(views: [neuralBox, neuralRetry])],
             [NSGridCell.emptyContentView, neuralStatus],
-            [caption(tr("Unload model from memory", "Выгружать модель из памяти")), unloadPopup],
+            [caption(tr("Unload model from memory", "Выгружать модель из памяти")), glassPopup(unloadPopup)],
             [NSGridCell.emptyContentView, note(tr("The model reloads while you speak; on the GPU this takes under a second.", "Модель загружается заново, пока вы говорите: на видеокарте это меньше секунды."))],
             [caption(tr("Sound and pasting", "Звук и вставка")), soundsBox],
             [NSGridCell.emptyContentView, muteBox],
@@ -98,12 +98,12 @@ final class SettingsPane: NSObject {
             [caption(tr("Updates", "Обновления")), NSStackView(views: [updatesBox, checkNow])],
             [NSGridCell.emptyContentView, updateStatus],
         ])
-        grid.rowSpacing = 10
+        grid.rowSpacing = 7
         grid.columnSpacing = 14
         grid.column(at: 0).xPlacement = .trailing
-        grid.rowAlignment = .firstBaseline
-        grid.row(at: 0).yPlacement = .center
-        grid.row(at: 0).rowAlignment = .none
+        // Glass capsules have no text baseline: centre every row instead.
+        grid.rowAlignment = .none
+        grid.yPlacement = .center
         for i in [3, 7, 9, 11, 15, 18] { grid.row(at: i).topPadding = -6 }
         updateStatus.font = .systemFont(ofSize: 11)
         updateStatus.textColor = .secondaryLabelColor
@@ -112,7 +112,7 @@ final class SettingsPane: NSObject {
         let stack = NSStackView(views: [grid])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 16, right: 20)
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 20, bottom: 16, right: 24)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let root = NSView()
         root.addSubview(stack)

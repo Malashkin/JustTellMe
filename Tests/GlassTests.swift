@@ -66,6 +66,30 @@ enum GlassTests {
             T.ok(abs(centre(cell("status")) - text) <= 1, "status capsule \(centre(cell("status"))) vs text line \(text)")
             T.ok(abs(centre(cell("check")) - text) <= 1, "checkbox \(centre(cell("check"))) vs text line \(text)")
         }
+        T.test("lists: checkbox and day header sit inside the row highlight, with room") {
+            let store = VoiceLists.shared
+            let l = store.addList(name: "Pad", keywords: ["Отступ"], kind: .tasks)
+            defer { store.removeList(l.id) }
+            store.addItem(to: l.id, text: "Check the padding.", lang: "en")
+            let pane = ListPane(listID: l.id)
+            pane.reload()
+            func find(_ v: NSView) -> NSTableView? { (v as? NSTableView) ?? v.subviews.lazy.compactMap(find).first }
+            guard let table = find(pane.view) else { return T.ok(false, "table") }
+            table.frame = NSRect(x: 0, y: 0, width: 800, height: 400)
+            let row = 1
+            guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: true),
+                  let header = table.view(atColumn: 0, row: 0, makeIfNecessary: true) else { return T.ok(false, "cells") }
+            cell.frame = table.frameOfCell(atColumn: 0, row: row)
+            cell.layoutSubtreeIfNeeded()
+            header.frame = table.frameOfCell(atColumn: 0, row: 0)
+            header.layoutSubtreeIfNeeded()
+            guard let box = cell.subviews.first, let title = header.subviews.first else { return T.ok(false, "controls") }
+            let boxX = table.convert(box.alignmentRect(forFrame: box.frame), from: cell).minX
+            let titleX = table.convert(title.frame, from: header).minX
+            let highlight = table.rect(ofRow: row).insetBy(dx: CapsuleRowView().inset, dy: 0)
+            T.ok(boxX - highlight.minX >= 8, "checkbox \(boxX) vs highlight edge \(highlight.minX)")
+            T.ok(abs(titleX - boxX) <= 3, "day header \(titleX) lines up with the checkbox \(boxX)")
+        }
         T.test("theme: Auto / Light / Dark is saved, applied and announced") {
             let saved = Prefs.theme
             defer { Prefs.theme = saved }
