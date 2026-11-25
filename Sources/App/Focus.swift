@@ -79,7 +79,7 @@ final class NoFieldCard: NSObject {
     private var panel: NSPanel?
     private let title = NSTextField(labelWithString: tr("No text field?", "Курсор не в поле ввода?"))
     private let body = NSTextField(wrappingLabelWithString: "")
-    private let copyButton = NSButton(title: tr("Copy", "Скопировать"), target: nil, action: nil)
+    private let copyButton = CapsuleButton(tr("Copy", "Скопировать"), style: .prominent)
     private var text = ""
     private var hideWork: DispatchWorkItem?
     private let size = NSSize(width: 380, height: 132)
@@ -138,35 +138,29 @@ final class NoFieldCard: NSObject {
         p.becomesKeyOnlyIfNeeded = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
-        let bg = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        bg.material = .popover
-        bg.state = .active
-        bg.wantsLayer = true
-        bg.layer?.cornerRadius = 12
-        bg.layer?.masksToBounds = true
+        let bg = Glass.backdrop(.popover, radius: 22)
+        bg.frame = NSRect(origin: .zero, size: size)
 
         // Fixed layout (the panel has a fixed size): title, hint, two lines of text, buttons.
-        let w = size.width - 28
+        let w = size.width - 36
         title.font = .systemFont(ofSize: 13, weight: .semibold)
-        title.frame = NSRect(x: 14, y: size.height - 30, width: w, height: 18)
+        title.frame = NSRect(x: 18, y: size.height - 30, width: w, height: 18)
         let sub = NSTextField(labelWithString: tr("If the text didn't appear, copy it:", "Если текст не появился, скопируйте его:"))
         sub.textColor = .secondaryLabelColor
         sub.font = .systemFont(ofSize: 11)
-        sub.frame = NSRect(x: 14, y: size.height - 47, width: w, height: 15)
+        sub.frame = NSRect(x: 18, y: size.height - 47, width: w, height: 15)
         body.font = .systemFont(ofSize: 12)
         body.maximumNumberOfLines = 2
         body.cell?.truncatesLastVisibleLine = true
         body.lineBreakMode = .byWordWrapping
-        body.frame = NSRect(x: 14, y: 46, width: w, height: 34)
+        body.frame = NSRect(x: 18, y: 46, width: w, height: 34)
         copyButton.target = self
         copyButton.action = #selector(copyText)
-        copyButton.bezelStyle = .rounded
-        copyButton.keyEquivalent = "\r" // drawn as the default (accent) button
-        copyButton.frame = NSRect(x: size.width - 14 - 130, y: 8, width: 130, height: 30)
-        let closeButton = NSButton(title: tr("Close", "Закрыть"), target: self, action: #selector(close))
-        closeButton.bezelStyle = .rounded
-        closeButton.frame = NSRect(x: copyButton.frame.minX - 100, y: 8, width: 100, height: 30)
-        for v in [title, sub, body, closeButton, copyButton] as [NSView] { bg.addSubview(v) }
+        copyButton.keyEquivalent = "\r"
+        copyButton.frame = NSRect(x: size.width - 12 - 130, y: 10, width: 130, height: 30)
+        let closeButton = CapsuleButton(tr("Close", "Закрыть"), target: self, action: #selector(close))
+        closeButton.frame = NSRect(x: copyButton.frame.minX - 108, y: 10, width: 100, height: 30)
+        for v in [title, sub, body, closeButton, copyButton] as [NSView] { bg.addSubview(v, positioned: .below, relativeTo: nil) }
         p.contentView = bg
         return p
     }

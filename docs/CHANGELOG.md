@@ -10,6 +10,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Changed
+- **Liquid Glass design.** The main window is now glass: the desktop shows through a blurred window with no title bar, the sidebar is a floating glass panel with a capsule for the chosen page, lists and the Home feed sit on glass cards, and buttons, search fields, filters and the status of a task are capsules. The task status is a capsule that opens a Backlog / Done menu; the list buttons (Done, To Backlog, Due Date…, Check All, Delete) are one glass bar under the list. Every page has a large title. The recording pill, the “Saved to …” card and the “No text field?” card are glass too and follow Light/Dark mode. Built from `NSVisualEffectView` and layers, so it works on macOS 13+ and respects “Reduce transparency” ([ADR 012](architecture/decisions/012-liquid-glass-design.md)).
+- **Toy-brick palette, no red.** The interface uses bright blue, yellow, green and orange (`Brick` in `Glass.swift`). The main action is tinted blue glass instead of a solid blue slab; Delete, Clear All and overdue dates are orange; Done is green; the recording dot and the menu-bar mic while recording are orange, transcribing is blue; the statistics chart is blue with today in orange.
+- **Light / Dark switch.** Auto (follows macOS), Light or Dark: at the bottom of the sidebar, on the Settings page (“Appearance”) and in the 🎙 menu → Settings. It applies to the window, the recording pill and the cards.
+- The window buttons (close, minimise, zoom) sit inside the sidebar panel instead of on its top edge; the window can be dragged by any empty glass.
+- The checkbox and the status capsule of a task are centred on the first line of its text (the capsule sat 4 pt low).
+- `--demo-window` draws the glass over a sample wallpaper (the blurred desktop can't be captured off screen); `JTM_DEMO_DELAY=<seconds>` keeps each page on screen longer, `--dark` renders the pages in Dark mode.
+
+## [1.3.0] — 2026-11-24
+
 ### Added
 - **English interface.** The app follows the system language: English, or Russian when macOS prefers Russian. Default lists are Notes/Tasks with the command words Note/Task in English, Заметки/Задачи with Заметка/Задача in Russian. `JTM_LANG=en|ru` forces a language.
 - **Voice lists.** Start a dictation with a list's command word and the rest of the phrase is saved to that list instead of being pasted: “Note: call the bank” → Notes, “Task: send the report” → Tasks (on a Russian system «Заметка: позвонить в банк» → Заметки, «Задача: отправить отчёт» → Задачи). A “Saved to “…”” card confirms it, with a button to open the list. Each list is a page in the sidebar; nothing goes to the Home feed or the stats.

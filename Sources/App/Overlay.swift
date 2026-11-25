@@ -6,7 +6,7 @@ import Cocoa
 final class RecordingOverlay {
     enum Mode { case hidden, recording, transcribing }
 
-    private let size = NSSize(width: 168, height: 44)
+    private let size = NSSize(width: 196, height: 50)
     private var panel: NSPanel?
     private let wave = WaveView()
     private let lockDot = NSView()
@@ -49,7 +49,7 @@ final class RecordingOverlay {
                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
               let ctx = NSGraphicsContext(bitmapImageRep: rep)?.cgContext else { return }
         ctx.scaleBy(x: 2, y: 2)
-        ctx.setFillColor(NSColor(white: 0.15, alpha: 1).cgColor)
+        ctx.setFillColor(NSColor(calibratedRed: 0.78, green: 0.82, blue: 0.95, alpha: 1).cgColor)
         ctx.fill(v.bounds)
         layer.render(in: ctx)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
@@ -83,24 +83,16 @@ final class RecordingOverlay {
         p.hidesOnDeactivate = false
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
-        let bg = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        bg.material = .hudWindow
-        bg.appearance = NSAppearance(named: .vibrantDark)
-        bg.state = .active
-        bg.blendingMode = .behindWindow
+        // A glass capsule: the blurred screen behind it, a light edge, bars in the label color.
         // maskImage (not layer.cornerRadius) is what actually clips the behind-window blur to the pill shape.
-        let radius = size.height / 2
-        bg.maskImage = NSImage(size: size, flipped: false) { rect in
-            NSColor.black.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
-            return true
-        }
-        wave.frame = bg.bounds.insetBy(dx: 18, dy: 8)
-        bg.addSubview(wave)
-        lockDot.frame = NSRect(x: 7, y: (size.height - 7) / 2, width: 7, height: 7)
+        let bg = Glass.backdrop(.popover, radius: size.height / 2)
+        bg.frame = NSRect(origin: .zero, size: size)
+        wave.frame = bg.bounds.insetBy(dx: 24, dy: 10)
+        bg.addSubview(wave, positioned: .below, relativeTo: nil)
+        lockDot.frame = NSRect(x: 9, y: (size.height - 9) / 2, width: 9, height: 9)
         lockDot.wantsLayer = true
-        lockDot.layer?.cornerRadius = 3.5
-        lockDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+        lockDot.layer?.cornerRadius = 4.5
+        lockDot.layer?.backgroundColor = Brick.orange.cgColor
         lockDot.isHidden = !locked
         bg.addSubview(lockDot)
         p.contentView = bg
@@ -187,10 +179,15 @@ final class WaveView: NSView {
         }
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        recolor()
+    }
+
     private func recolor() {
-        let c = mode == .transcribing ? NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.35, alpha: 0.95) : .white
+        let c = cg(mode == .transcribing ? Brick.blueText : NSColor.labelColor.withAlphaComponent(0.85))
         CATransaction.begin(); CATransaction.setDisableActions(true)
-        for b in bars { b.backgroundColor = c.cgColor }
+        for b in bars { b.backgroundColor = c }
         CATransaction.commit()
     }
 

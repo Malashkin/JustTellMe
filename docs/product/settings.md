@@ -12,6 +12,7 @@ Values are stored in `UserDefaults` (domain `com.justtellme.app`). Read them wit
 
 | Setting | Key | Default | Notes |
 |---|---|---|---|
+| Appearance | `theme` | `system` | `system` (follows macOS), `light` or `dark`. Also at the bottom of the sidebar and in the 🎙 menu → Settings. |
 | Dictation key | `hotkey` | `fn` | `fn` or `rightOption` |
 | How the key works | `trigger` | `holdOrDoubleTap` | `holdOrDoubleTap`: a double tap means hands-free. `holdOrTap`: a single short tap means hands-free. `holdOnly`: hold only. |
 | Language | `language` | `auto` | `auto` decodes as Russian (no detection pass). The label in history comes from the script. |

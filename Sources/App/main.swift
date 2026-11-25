@@ -131,20 +131,22 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-window out-prefix   (renders every page of the main window with the real history, for checking the layout)
+//   JustTellMe --demo-window out-prefix [--ok] [--dark]   (renders every page of the main window with the real history, for checking the layout)
 if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
-    app.appearance = NSAppearance(named: .aqua)
+    app.appearance = NSAppearance(named: args.contains("--dark") ? .darkAqua : .aqua)
     let w = MainWindow()
-    w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: false, modelReady: true) }
+    // --ok: every permission granted (screenshots); otherwise one warning shows, to check that layout too.
+    let allOK = args.contains("--ok")
+    w.home.status = { AppStatus(hotkey: "Fn", micOK: true, accessOK: allOK, modelReady: true) }
     var pages = w.demoItems
     var n = 0
     func next() {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
         w.present(p)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Double(ProcessInfo.processInfo.environment["JTM_DEMO_DELAY"] ?? "") ?? 0.8)) {
             w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
             n += 1
             next()

@@ -227,14 +227,14 @@ final class StatsPane: NSObject {
 final class StatCard: NSView {
     private let valueLabel = NSTextField(labelWithString: "—")
     var value: String { get { valueLabel.stringValue } set { valueLabel.stringValue = newValue } }
-    var accent = false { didSet { valueLabel.textColor = accent ? .systemOrange : .labelColor } }
+    var accent = false { didSet { valueLabel.textColor = accent ? Brick.orangeText : .labelColor } }
 
     init(title: String) {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 10
-        let t = NSTextField(labelWithString: title.uppercased())
-        t.font = .systemFont(ofSize: 11, weight: .semibold)
+        layer?.cornerRadius = 18
+        let t = NSTextField(labelWithString: title)
+        t.font = .systemFont(ofSize: 12, weight: .medium)
         t.textColor = .secondaryLabelColor
         valueLabel.font = .systemFont(ofSize: 24, weight: .semibold)
         let s = NSStackView(views: [t, valueLabel])
@@ -252,7 +252,11 @@ final class StatCard: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    override func updateLayer() { layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.12).cgColor }
+    override func updateLayer() {
+        layer?.backgroundColor = cg(Glass.fill)
+        layer?.borderColor = cg(Glass.edge)
+        layer?.borderWidth = 1
+    }
     override var wantsUpdateLayer: Bool { true }
 }
 
@@ -286,7 +290,7 @@ private final class ShareRow: NSView {
         NSBezierPath(roundedRect: track, xRadius: 1.5, yRadius: 1.5).fill()
         var fill = track
         fill.size.width = max(3, bounds.width * share)
-        NSColor.controlAccentColor.setFill()
+        Brick.blue.setFill()
         NSBezierPath(roundedRect: fill, xRadius: 1.5, yRadius: 1.5).fill()
     }
 }
@@ -311,7 +315,7 @@ private final class BarChartView: NSView {
             let h = d.words == 0 ? 2 : max(4, plotH * CGFloat(d.words) / CGFloat(maxV))
             let r = NSRect(x: x, y: labelH, width: barW, height: h)
             let isToday = cal.isDateInToday(d.day)
-            (d.words == 0 ? NSColor.quaternaryLabelColor : isToday ? NSColor.systemOrange : NSColor.controlAccentColor).setFill()
+            (d.words == 0 ? NSColor.quaternaryLabelColor : isToday ? Brick.orange : Brick.blue).setFill()
             NSBezierPath(roundedRect: r, xRadius: min(3, barW / 2), yRadius: min(3, barW / 2)).fill()
 
             if d.words == maxV && d.words > 0 {
