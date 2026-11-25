@@ -397,7 +397,7 @@ enum ListFilter {
     /// Date and time shown on every entry, e.g. "Nov 23, 10:04".
     static func stamp(_ date: Date) -> String { stampFmt.string(from: date) }
 
-    /// The small line under a task: "Due Nov 25 — overdue · Done Nov 24, 10:04".
+    /// The dates after a task text: "Due Nov 25 — overdue · Done Nov 24, 10:04".
     static func detail(_ item: ListItem, now: Date) -> String? {
         var parts: [String] = []
         if let due = item.due { parts.append(tr("Due ", "Срок: ") + shortDateFmt.string(from: due) + (isOverdue(item, now: now) ? tr(" — overdue", " — просрочено") : "")) }
@@ -888,20 +888,30 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         return probe.fittingSize.height
     }()
 
-    private func itemText(_ i: ListItem) -> NSAttributedString {
+    /// The text of an entry. A task's due and done dates follow the text on the same line, so a one-line task
+    /// is as tall as any other and the status capsules stay evenly spaced.
+    static func itemText(_ i: ListItem, kind: VoiceList.Kind, now: Date) -> NSAttributedString {
         let para = NSMutableParagraphStyle()
         para.lineBreakMode = .byWordWrapping
         para.paragraphSpacing = 2
         let done = kind == .tasks && i.status == .done
-        var attrs: [NSAttributedString.Key: Any] = [.font: Self.textFont, .paragraphStyle: para,
+        var attrs: [NSAttributedString.Key: Any] = [.font: textFont, .paragraphStyle: para,
                                                      .foregroundColor: done ? NSColor.secondaryLabelColor : NSColor.labelColor]
         if done { attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
         let s = NSMutableAttributedString(string: i.text, attributes: attrs)
-        if kind == .tasks, let d = ListFilter.detail(i, now: Date()) {
-            let color: NSColor = ListFilter.isOverdue(i, now: Date()) ? Brick.orangeText : .tertiaryLabelColor
-            s.append(NSAttributedString(string: "\n" + d, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: para]))
+        if kind == .tasks, let d = ListFilter.detail(i, now: now) {
+            let color: NSColor = ListFilter.isOverdue(i, now: now) ? Brick.orangeText : .tertiaryLabelColor
+            s.append(NSAttributedString(string: "   " + d, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: para]))
         }
         return s
+    }
+
+    /// Row height of an entry whose text column is `width` wide.
+    static func rowHeight(_ i: ListItem, kind: VoiceList.Kind, width: CGFloat, now: Date) -> CGFloat {
+        let w = max(100, width - 8)
+        let r = itemText(i, kind: kind, now: now).boundingRect(with: NSSize(width: w, height: .greatestFiniteMagnitude),
+                                                               options: [.usesLineFragmentOrigin, .usesFontLeading])
+        return max(ceil(r.height) + 14, kind == .tasks ? 30 : 0)
     }
 
     func tableView(_ tableView: NSTableView, viewFor col: NSTableColumn?, row: Int) -> NSView? {
@@ -956,7 +966,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
                 t.textColor = .tertiaryLabelColor
                 top = 7
             } else {
-                t.attributedStringValue = itemText(i)
+                t.attributedStringValue = Self.itemText(i, kind: kind, now: Date())
                 t.isSelectable = true   // select part of the text with the mouse, ⌘C
             }
         }
@@ -973,9 +983,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         switch rows[row] {
         case .day: return 36
         case .item(let i):
-            let w = max(100, (tableView.tableColumns.last?.width ?? 600) - 8)
-            let r = itemText(i).boundingRect(with: NSSize(width: w, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading])
-            return max(ceil(r.height) + 14, kind == .tasks ? 30 : 0)
+            return Self.rowHeight(i, kind: kind, width: tableView.tableColumns.last?.width ?? 600, now: Date())
         }
     }
 }

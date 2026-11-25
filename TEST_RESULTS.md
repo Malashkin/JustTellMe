@@ -16,7 +16,7 @@
 | Unit, Liquid Glass controls, theme and palette | 9 | ✅ | glass colors differ in Light/Dark mode, capsule button title/padding/disabled state, segmented capsule reports a pick once and raises only the chosen segment, the blur mask stretches and the backdrop blends behind the window, checkbox and status capsule centred on the first text line of a task, Auto/Light/Dark saved, applied and announced, icon-only theme switch keeps labels for VoiceOver, window buttons inside the sidebar panel, palette has no red (Light and Dark text colors too), Delete is orange |
 | Contract / E2E | N/A | – | no API; the GUI isn't automatable here (no Screen Recording / UI test runner) |
 
-**Total:** 140 passed, 0 failed, 1 skipped (update archive signed by another certificate: this local build is ad-hoc signed, so there is nothing to compare), 76 s (fast suite: 130 passed, 4 s). Every page of the main window was also rendered with `--demo-window` and checked by eye. Stream: ready 0.57 s after release; reload after idle 0.21 s.
+**Total:** 141 passed, 0 failed, 1 skipped (update archive signed by another certificate: this local build is ad-hoc signed, so there is nothing to compare), 76 s (fast suite: 131 passed, 4 s). Every page of the main window was also rendered with `--demo-window` and checked by eye. Stream: ready 0.57 s after release; reload after idle 0.21 s.
 
 ## Mutation testing
 
