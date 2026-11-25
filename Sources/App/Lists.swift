@@ -16,6 +16,9 @@ struct VoiceList: Codable, Equatable {
     var name: String
     var keywords: [String]
     var kind: Kind
+    /// Set when the list is moved to the archive: hidden from the sidebar, no longer catches dictation, entries kept.
+    var archivedAt: Date? = nil
+    var isArchived: Bool { archivedAt != nil }
 }
 
 enum TaskStatus: String, Codable, CaseIterable {
@@ -112,6 +115,11 @@ final class VoiceLists {
 
     func list(_ id: UUID) -> VoiceList? { lists.first { $0.id == id } }
 
+    /// Lists in the sidebar, which catch dictation.
+    var active: [VoiceList] { lists.filter { !$0.isArchived } }
+    /// Lists in the archive, the most recently archived first.
+    var archived: [VoiceList] { lists.filter(\.isArchived).sorted { $0.archivedAt! > $1.archivedAt! } }
+
     func items(_ id: UUID) -> [ListItem] {
         if let c = cache[id] { return c }
         let loaded = (try? Data(contentsOf: itemsURL(id))).flatMap { try? Self.decoder.decode([ListItem].self, from: $0) } ?? []
@@ -135,6 +143,25 @@ final class VoiceLists {
         saveLists()
     }
 
+    func archive(_ id: UUID, now: Date = Date()) {
+        guard let i = lists.firstIndex(where: { $0.id == id }), !lists[i].isArchived else { return }
+        lists[i].archivedAt = now
+        saveLists()
+    }
+
+    /// Brings a list back from the archive. Command words that another list took meanwhile are dropped
+    /// from it and returned, so the caller can say so.
+    @discardableResult
+    func restore(_ id: UUID) -> [String] {
+        guard let i = lists.firstIndex(where: { $0.id == id }), lists[i].isArchived else { return [] }
+        let taken = Set(active.flatMap(\.keywords).map(SpokenKeyword.normalize))
+        let dropped = lists[i].keywords.filter { taken.contains(SpokenKeyword.normalize($0)) }
+        lists[i].keywords.removeAll { taken.contains(SpokenKeyword.normalize($0)) }
+        lists[i].archivedAt = nil
+        saveLists()
+        return dropped
+    }
+
     /// Deletes the list and every entry in it.
     func removeList(_ id: UUID) {
         lists.removeAll { $0.id == id }
@@ -154,6 +181,13 @@ final class VoiceLists {
         cache[list] = all
         saveItems(list)
         return item
+    }
+
+    /// Changes an entry's text (typed by the user). Empty text is ignored; the date stays.
+    func setText(_ text: String, id: UUID, in list: UUID) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        update([id], in: list) { $0.text = t }
     }
 
     func removeItems(_ ids: Set<UUID>, from list: UUID) {
@@ -211,7 +245,7 @@ final class VoiceLists {
         return nearMiss
     }
 
-    func match(_ text: String) -> (list: VoiceList, body: String)? { Self.match(text, in: lists) }
+    func match(_ text: String) -> (list: VoiceList, body: String)? { Self.match(text, in: active) }
 
     // MARK: editing a list
 
@@ -384,6 +418,8 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     private let titleLabel = NSTextField(labelWithString: "")
     private let hint = NSTextField(wrappingLabelWithString: "")
     private let table = SelectableTextTableView()
+    /// Type an entry and press Enter: it goes on top, like a dictated one.
+    private let composer = NSTextField()
     private let search = NSSearchField()
     private let countLabel = NSTextField(labelWithString: "")
     private let deleteButton = CapsuleButton(tr("Delete", "Удалить"), style: .destructive)
@@ -444,7 +480,33 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
     /// Several entries are copied one per line, in the order shown.
     static func copyText(_ items: [ListItem]) -> String { items.map(\.text).joined(separator: "\n") }
 
+    static func composerPlaceholder(_ kind: VoiceList.Kind) -> String {
+        kind == .tasks ? tr("New task — type and press Enter", "Новая задача — введите и нажмите Enter")
+                       : tr("New note — type and press Enter", "Новая заметка — введите и нажмите Enter")
+    }
+
+    /// Adds a typed entry on top (tasks start in Backlog).
+    func addTyped(_ raw: String) {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        VoiceLists.shared.addItem(to: listID, text: t, lang: L10n.isRussian ? "ru" : "en")
+        reload()
+    }
+
+    @objc private func composerAction() {
+        addTyped(composer.stringValue)
+        composer.stringValue = ""
+    }
+
     static func keywordHint(_ l: VoiceList) -> String {
+        if l.isArchived {
+            return tr("This list is in the archive: its command words don’t work. Restore it on the Archive page to use it again.",
+                      "Этот список в архиве: его слова-команды не работают. Верните его на странице «Архив», чтобы снова пользоваться.")
+        }
+        if l.keywords.isEmpty {
+            return tr("This list has no command words: add entries by typing, or give it a word in “Edit List…”.",
+                      "У этого списка нет слов-команд: добавляйте записи текстом или задайте слово в «Настроить…».")
+        }
         let words = l.keywords.map { tr("“\($0)”", "«\($0)»") }.joined(separator: ", ")
         return tr("Start a phrase with \(words) and the text is saved here instead of being pasted into the app. "
                   + "Select text with the mouse and press ⌘C; tick entries to delete several at once.",
@@ -530,14 +592,43 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         ])
         taskOnly = [filterRow, doneButton, backlogButton, dueButton]
 
+        composer.isBezeled = false
+        composer.isBordered = false
+        composer.drawsBackground = false
+        composer.focusRingType = .none
+        composer.font = .systemFont(ofSize: 13)
+        composer.target = self
+        composer.action = #selector(composerAction)
+        composer.cell?.usesSingleLineMode = true
+        composer.cell?.isScrollable = true
+        composer.setAccessibilityLabel(tr("New entry", "Новая запись"))
+        let plus = NSImageView(image: NSImage(systemSymbolName: "plus", accessibilityDescription: nil) ?? NSImage())
+        plus.symbolConfiguration = .init(pointSize: 12, weight: .semibold)
+        plus.contentTintColor = .secondaryLabelColor
+        let composerBox = GlassView(radius: 17, raised: true)
+        composerBox.capsule = true
+        for v in [plus, composer] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; composerBox.addSubview(v) }
+        NSLayoutConstraint.activate([
+            composerBox.heightAnchor.constraint(equalToConstant: 34),
+            plus.leadingAnchor.constraint(equalTo: composerBox.leadingAnchor, constant: 14),
+            plus.centerYAnchor.constraint(equalTo: composerBox.centerYAnchor),
+            composer.leadingAnchor.constraint(equalTo: plus.trailingAnchor, constant: 8),
+            composer.trailingAnchor.constraint(equalTo: composerBox.trailingAnchor, constant: -14),
+            composer.centerYAnchor.constraint(equalTo: composerBox.centerYAnchor),
+        ])
+
+        table.doubleAction = #selector(editClicked)
+        table.target = self
+        table.onReturn = { [weak self] in self?.editClicked() }
+
         let card = Glass.card(scroll)
-        let stack = NSStackView(views: [head, hint, filterRow, card, bar])
+        let stack = NSStackView(views: [head, hint, filterRow, composerBox, card, bar])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
         stack.setCustomSpacing(4, after: head)
         stack.edgeInsets = NSEdgeInsets(top: 8, left: 20, bottom: 16, right: 24)
-        for v in [head, hint, filterRow, card, bar] as [NSView] {
+        for v in [head, hint, filterRow, composerBox, card, bar] as [NSView] {
             v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
         }
         card.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -579,6 +670,7 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         guard let l = list else { return }
         titleLabel.stringValue = l.name
         hint.stringValue = Self.keywordHint(l)
+        composer.placeholderString = Self.composerPlaceholder(l.kind)
         rebuildColumns()
         taskOnly.forEach { $0.isHidden = l.kind != .tasks }
         let custom = l.kind == .tasks && period != .all && ListFilter.Period.presets.allSatisfy { $0.1 != period }
@@ -716,6 +808,36 @@ final class ListPane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         let ids = Set(items.map(\.id))
         if r == .alertFirstButtonReturn { VoiceLists.shared.setDue(picker.dateValue, ids: ids, in: listID) }
         if hasDue && r == .alertThirdButtonReturn { VoiceLists.shared.setDue(nil, ids: ids, in: listID) }
+    }
+
+    @objc private func editClicked() {
+        let items = selected
+        guard items.count == 1 else { return }
+        editEntry(items[0])
+    }
+
+    private func editEntry(_ item: ListItem) {
+        let a = NSAlert()
+        a.messageText = kind == .tasks ? tr("Edit Task", "Изменить задачу") : tr("Edit Entry", "Изменить запись")
+        let tv = NSTextView(frame: NSRect(x: 0, y: 0, width: 380, height: 110))
+        tv.string = item.text
+        tv.font = .systemFont(ofSize: 13)
+        tv.isRichText = false
+        tv.allowsUndo = true
+        tv.isAutomaticQuoteSubstitutionEnabled = false
+        tv.textContainerInset = NSSize(width: 4, height: 6)
+        tv.autoresizingMask = [.width]
+        let sv = NSScrollView(frame: NSRect(x: 0, y: 0, width: 380, height: 110))
+        sv.documentView = tv
+        sv.hasVerticalScroller = true
+        sv.borderType = .bezelBorder
+        a.accessoryView = sv
+        a.addButton(withTitle: tr("Save", "Сохранить"))
+        a.addButton(withTitle: tr("Cancel", "Отмена"))
+        a.window.initialFirstResponder = tv
+        tv.selectAll(nil)
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        VoiceLists.shared.setText(tv.string, id: item.id, in: listID)
     }
 
     private func confirmDelete(_ items: [ListItem]) {
@@ -866,6 +988,7 @@ extension ListPane: NSMenuDelegate {
         guard !items.isEmpty else { return }
         func add(_ title: String, _ sel: Selector) { menu.addItem(withTitle: title, action: sel, keyEquivalent: "").target = self }
         add(tr("Copy", "Скопировать"), #selector(copyClicked))
+        if items.count == 1 { add(tr("Edit…", "Изменить…"), #selector(editClicked)) }
         if kind == .tasks {
             menu.addItem(.separator())
             if items.contains(where: { $0.status == .backlog }) { add("Done", #selector(menuDone)) }
@@ -881,7 +1004,7 @@ extension ListPane: NSMenuDelegate {
 // MARK: - "New List" / "Edit List…" dialog
 
 enum ListEditor {
-    enum Result { case saved(VoiceList), deleted, cancelled }
+    enum Result { case saved(VoiceList), deleted, archived, cancelled }
 
     /// Asks for the name, command words and kind; validates and saves. `existing` nil creates a list.
     static func run(_ existing: VoiceList?) -> Result {
@@ -917,16 +1040,23 @@ enum ListEditor {
             a.accessoryView = grid
             a.addButton(withTitle: existing == nil ? tr("Create", "Создать") : tr("Save", "Сохранить"))
             a.addButton(withTitle: tr("Cancel", "Отмена"))
-            if existing != nil { a.addButton(withTitle: tr("Delete List…", "Удалить список…")) }
+            if existing != nil {
+                a.addButton(withTitle: tr("Delete List…", "Удалить список…"))
+                if existing?.isArchived == false { a.addButton(withTitle: tr("Move to Archive", "Убрать в архив")) }
+            }
             a.window.initialFirstResponder = name
             let r = a.runModal()
             if r == .alertSecondButtonReturn { return .cancelled }
             if r == .alertThirdButtonReturn, let l = existing {
                 return confirmDelete(l) ? .deleted : .cancelled
             }
+            if r.rawValue == NSApplication.ModalResponse.alertThirdButtonReturn.rawValue + 1, let l = existing {
+                store.archive(l.id)
+                return .archived
+            }
             let n = name.stringValue.trimmingCharacters(in: .whitespaces)
             let k = VoiceLists.parseKeywords(words.stringValue)
-            if let p = VoiceLists.problem(name: n, keywords: k, editing: existing?.id, among: store.lists) {
+            if let p = VoiceLists.problem(name: n, keywords: k, editing: existing?.id, among: store.active) {
                 error = p
                 continue
             }
@@ -940,7 +1070,7 @@ enum ListEditor {
         }
     }
 
-    private static func confirmDelete(_ l: VoiceList) -> Bool {
+    static func confirmDelete(_ l: VoiceList) -> Bool {
         let n = VoiceLists.shared.items(l.id).count
         let a = NSAlert()
         let entries = L10n.plural(n, en: ("entry", "entries"), ru: ("запись", "записи", "записей"))

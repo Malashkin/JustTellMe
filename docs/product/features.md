@@ -48,7 +48,8 @@ Click the app icon in Finder, Launchpad or the Dock, or use 🎙 → Open JustTe
 | Page | What's there |
 |---|---|
 | **Home** | How-to; warnings with a fix button (no mic or Accessibility, Wispr Flow running, 🌐 switches layout); today's words, speed, streak, time saved; everything dictated, grouped by day, with time and app. Select any part of the text with the mouse and press ⌘C; ⌘C on highlighted rows or a double click on the time copies the whole entry. Search; right-click to fix or delete; “Clear All…”. |
-| **Notes**, **Tasks**, own lists | One page per voice list (see above), in the sidebar after Home, followed by “New List”. |
+| **Notes**, **Tasks**, own lists | One page per voice list (see above), in the sidebar after Home, followed by “New List”. A field above the list adds a typed entry (Enter); double-click, Enter or right-click → “Edit…” changes an entry’s text. Right-click a list in the sidebar → “Edit List…”, “Move to Archive”, “Delete List…”. |
+| **Archive** | Shown in the sidebar while a list is archived (“Archive (n)”): archived lists with Open, Restore and Delete…. Archived lists keep their entries but don’t catch dictation; on restore, command words another list took meanwhile are dropped, with a message. |
 | **Statistics** | Today / 7 days / 30 days / All time: words, characters, dictations, speaking time, words per minute, time saved (typing at 40 wpm minus speaking time); words-per-day chart; apps; languages; streak |
 | **Dictionary** | Your words as chips (Enter adds, × removes); replacements as “recognised as → write instead” rows; a switch and a “Show List” button for the read-only built-in dictionary; the recogniser prompt under “Advanced”. Changes are saved at once; the files stay plain text (`dictionary.txt`, `replacements.txt`, comments kept), “Open Folder” shows them. |
 | **Settings** | All settings, see [settings.md](settings.md) |

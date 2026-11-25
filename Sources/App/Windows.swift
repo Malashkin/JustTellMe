@@ -547,6 +547,13 @@ final class CorrectionWindow: NSObject {
 /// ⌘C with no text selected copies the selected rows through `onCopy`.
 final class SelectableTextTableView: NSTableView, NSMenuItemValidation {
     var onCopy: (() -> Void)?
+    /// Return / Enter on the highlighted row (lists: edit the entry).
+    var onReturn: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        if let onReturn, [36, 76].contains(event.keyCode), !selectedRowIndexes.isEmpty { onReturn(); return }
+        super.keyDown(with: event)
+    }
 
     override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
         if let field = responder as? NSTextField, field.isSelectable { return true }

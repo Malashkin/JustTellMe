@@ -65,6 +65,8 @@ A card confirms where the text went, with a button to open the list:
 ![Saved to Notes](docs/images/saved-card.png)
 
 - **Your own lists.** Click **New List** in the sidebar. Give the list a name and one or more command words separated by commas (“Idea, Thought”). Then choose its type: **Notes** for plain entries, or **Tasks**. **Edit List…** renames a list, changes its words or type, or deletes it.
+- **Type, not only speak.** The field above every list adds an entry by typing (Enter). To change an entry's text, double-click it, press Enter on it, or right-click → **Edit…**.
+- **Archive or delete lists.** Right-click a list in the sidebar (or use **Edit List…**) → **Move to Archive** or **Delete List…**. An archived list leaves the sidebar and its command words stop working, but its entries are kept; **Archive** in the sidebar opens, restores or deletes it.
 - **Forgiving matching.**
   - Only the first word counts, so “This note is about…” is pasted as usual.
   - Command words of 6 letters or more still match when the recogniser gets one letter wrong or splits the word in two («Замевка», «За метка»).

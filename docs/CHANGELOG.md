@@ -10,6 +10,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Added
+- **Archive for lists.** Right-click a list in the sidebar (or “Edit List…”) → “Move to Archive”: it leaves the sidebar, its command words stop working, the entries stay. “Archive (n)” in the sidebar opens, restores or deletes archived lists; on restore, command words another list took meanwhile are dropped and you are told. “Delete List…” is in the same right-click menu.
+- **Typed entries.** A field above every list adds an entry by typing; tasks start in Backlog.
+- **Edit an entry.** Double-click, Enter or right-click → “Edit…” changes the text of a note or task; its date stays.
+
 ### Fixed
 - Lists and the Home feed: the checkbox, time and day headers no longer touch the edge of the row highlight.
 - Statistics and Settings use the glass controls too: the period switch is a glass capsule, pop-up menus and buttons are glass capsules, and the right margin matches the other pages.
