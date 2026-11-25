@@ -4,6 +4,17 @@ import Cocoa
 /// typed in and edited, not only dictated.
 enum ListArchiveTests {
     static func run() {
+        T.test("lists: a done or due task is as tall as a plain one, so status capsules are evenly spaced") {
+            let now = Date()
+            let plain = ListItem(date: now, text: "Prepare the report.", lang: "en")
+            let done = ListItem(date: now, text: "Prepare the report.", lang: "en", status: .done, doneAt: now)
+            let due = ListItem(date: now, text: "Prepare the report.", lang: "en", due: now.addingTimeInterval(86400))
+            let h = ListPane.rowHeight(plain, kind: .tasks, width: 700, now: now)
+            T.eq(ListPane.rowHeight(done, kind: .tasks, width: 700, now: now), h, "done")
+            T.eq(ListPane.rowHeight(due, kind: .tasks, width: 700, now: now), h, "due")
+            let text = ListPane.itemText(done, kind: .tasks, now: now).string
+            T.ok(!text.contains("\n") && text.hasPrefix("Prepare the report.") && text.contains(ListFilter.stamp(now)), text)
+        }
         T.test("lists: an archived list leaves the sidebar and stops catching dictation, entries kept") {
             let store = VoiceLists.shared
             let l = store.addList(name: "Archive me", keywords: ["Архивка"], kind: .notes)
