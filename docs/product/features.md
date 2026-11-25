@@ -15,7 +15,7 @@ UI names below are the English ones. Recognition does not depend on this: it is 
 ## Dictation
 
 - **Hold to talk:** hold Fn (🌐) or right ⌥, speak, then release. The text is pasted at the cursor in any app.
-- **Hands-free (double tap):** double-tap the key (two presses, the second within 0.4 s) and speak without holding it; one more press stops and transcribes. A red dot on the overlay shows this mode. Recording stops on its own after 5 minutes. A single stray tap does nothing. Other modes: “Hold, or tap once” (a single short tap starts hands-free) and “Hold only”.
+- **Hands-free (double tap):** double-tap the key (two presses, the second within 0.4 s) and speak without holding it; one more press stops and transcribes. An orange dot on the overlay shows this mode. Recording stops on its own after 5 minutes. A single stray tap does nothing. Other modes: “Hold, or tap once” (a single short tap starts hands-free) and “Hold only”.
 - **Esc** cancels the recording, or the recognition if it is already running.
 - **Overlay:** a pill at the bottom of the screen. A calm waveform shows recording; an orange animation shows recognition. It is drawn with Core Animation layers at 30 fps, about 2.4× less CPU than before.
 - **Speed:** long speech is recognised in pieces while you talk, so the text appears about 1 s after release (Neural Engine) or 1–2 s (GPU), even after 30 s of speech.
@@ -38,7 +38,7 @@ Start a dictation with a list's command word and the rest of the phrase goes to 
 - **Every list** shows entries grouped by day with dated headers (“Today, November 23”, “Yesterday, November 22”, “Tomorrow, November 24”, then full dates), the date and time on each entry, search, ticks with “Check All” and “Delete N …”, right-click → Copy / Delete, and text you can select with the mouse and copy with ⌘C.
 - **Tasks lists** add:
   - a status per task, Backlog or Done, from the menu in front of it, from “Done” / “To Backlog” for the ticked tasks, or from the right-click menu. Done tasks are struck through and remember when they were done.
-  - a due date: “Due Date…” (calendar), “Clear Due Date”. The line under a task shows “Due Nov 25”, in red with “— overdue” when it has passed in Backlog, and “Done Nov 24, 10:04”.
+  - a due date: “Due Date…” (calendar), “Clear Due Date”. The line under a task shows “Due Nov 25”, in orange with “— overdue” when it has passed in Backlog, and “Done Nov 24, 10:04”.
   - filters: Status (All / Backlog / Done); Date — Created, Due or Done — over Today, 7 days, 30 days, All dates or “Custom range…” (from–to, both days included). Created and Done look back; Due looks ahead (due in the next 1/7/30 days) and always includes overdue tasks in Backlog. Entries are grouped by the chosen date; due dates soonest first, tasks without one last under “No due date”.
 
 ## Main window

@@ -78,7 +78,7 @@ A card confirms where the text went, with a button to open the list:
 ![Tasks with status, due dates and filters](docs/images/tasks.png)
 
 - **Backlog / Done** status per task, from the menu in front of it, for all ticked tasks at once, or from the right-click menu. Done tasks are struck through and remember when they were finished.
-- **Due dates** come from a calendar. Overdue tasks are shown in red.
+- **Due dates** come from a calendar. Overdue tasks are shown in orange.
 - **Filters:**
   - by status;
   - by date: **Created**, **Due** or **Done**;
