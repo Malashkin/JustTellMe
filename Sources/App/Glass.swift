@@ -182,6 +182,9 @@ final class CapsuleButton: NSButton {
     override var title: String { didSet { restyle() } }
     override var isEnabled: Bool { didSet { alphaValue = isEnabled ? 1 : 0.45 } }
 
+    /// The bezel's default insets would make the frame (and the drawn capsule) larger than the laid-out size.
+    override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsetsZero }
+
     override var intrinsicContentSize: NSSize {
         if iconOnly { return NSSize(width: height + 12, height: height) }
         let w = attributedTitle.size().width
@@ -266,16 +269,23 @@ final class CapsuleSegments: GlassView {
         capsule = true
         let stack = NSStackView()
         stack.spacing = 2
+        stack.alignment = .centerY
+        stack.distribution = .fillEqually
         for (i, t) in titles.enumerated() {
             let b = CapsuleButton(t, style: .plain, target: self, action: #selector(pick(_:)))
             if let name = symbols?[i] {
-                b.image = NSImage(systemSymbolName: name, accessibilityDescription: t)
+                let img = NSImage(systemSymbolName: name, accessibilityDescription: t)?
+                    .withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
+                img?.size = NSSize(width: 18, height: 18)   // one box for every symbol, so they line up
+                b.image = img
+                b.imageScaling = .scaleNone
                 b.iconOnly = true
                 b.toolTip = t
                 b.setAccessibilityLabel(t)
             }
             b.tag = i
             b.height = 28
+            b.heightAnchor.constraint(equalToConstant: 28).isActive = true
             buttons.append(b)
             stack.addArrangedSubview(b)
         }
