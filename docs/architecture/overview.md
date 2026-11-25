@@ -28,7 +28,8 @@ The binary links only to system libraries, and `build.sh` checks this.
 | `Focus.swift` | `FocusedField`: is a text field focused (Accessibility, errs towards "unknown"); `NoFieldCard` with a Copy button |
 | `Updater.swift` | Daily check of the latest GitHub release; download, verify (bundle id, version, signature, same certificate), swap and relaunch |
 | `History.swift` | `history.json` (newest first, 2000 max), change callback |
-| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page), `ListEditor` (New List / Edit List…) |
+| `Lists.swift` | `VoiceList` / `ListItem` (model), `VoiceLists` (`lists.json` + `list-<id>.json`, first-run defaults and move from `notes.json`, which list a dictation belongs to), `ListFilter` (status, date field, period, day groups), `ListPane` (one list's page, typed entries, editing), `ListEditor` (New List / Edit List…, archive) |
+| `Archive.swift` | `ArchivePane`: the Archive page (archived lists: open, restore, delete); a list is archived when `VoiceList.archivedAt` is set |
 | `VoiceCommands.swift` | `SpokenKeyword` (a command word at the start, one letter off, split in two, lookalikes), `SavedCard` (“Saved to “…””) |
 | `Stats.swift` | `DictationStats` (pure aggregates) and `StatsPane` (Statistics page) |
 | `MainWindow.swift` | The main window: sidebar, `HomePane` (status, quick stats, feed) |

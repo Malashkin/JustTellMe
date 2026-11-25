@@ -72,7 +72,7 @@ final class StatsPane: NSObject {
     }
 
     private(set) lazy var view: NSView = build()
-    private let periodControl = NSSegmentedControl(labels: Period.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+    private let periodControl = CapsuleSegments(Period.allCases.map(\.title))
     private var cards: [StatCard] = []
     private let chart = BarChartView()
     private let chartTitle = NSTextField(labelWithString: "")
@@ -81,9 +81,8 @@ final class StatsPane: NSObject {
     private let streakLabel = NSTextField(labelWithString: "")
 
     private func build() -> NSView {
-        periodControl.selectedSegment = UserDefaults.standard.object(forKey: "statsPeriod") as? Int ?? Period.week.rawValue
-        periodControl.target = self
-        periodControl.action = #selector(periodChanged)
+        periodControl.selected = UserDefaults.standard.object(forKey: "statsPeriod") as? Int ?? Period.week.rawValue
+        periodControl.onChange = { [weak self] _ in self?.periodChanged() }
         let top = NSStackView(views: [periodControl, NSView()])
 
         cards = [tr("Words", "Слов"), tr("Characters", "Символов"), tr("Dictations", "Диктовок"),
@@ -120,7 +119,7 @@ final class StatsPane: NSObject {
         stack.setCustomSpacing(18, after: grid)
         stack.setCustomSpacing(4, after: chartTitle)
         stack.setCustomSpacing(18, after: chart)
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 20, bottom: 16, right: 20)
+        stack.edgeInsets = NSEdgeInsets(top: 8, left: 20, bottom: 16, right: 24)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let root = NSView()
         root.addSubview(stack)
@@ -131,7 +130,7 @@ final class StatsPane: NSObject {
             stack.bottomAnchor.constraint(lessThanOrEqualTo: root.bottomAnchor),
         ])
         for v in [top, grid, chart, bottom, foot] as [NSView] {
-            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
+            v.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -44).isActive = true
         }
         return root
     }
@@ -149,7 +148,7 @@ final class StatsPane: NSObject {
     }
 
     @objc private func periodChanged() {
-        UserDefaults.standard.set(periodControl.selectedSegment, forKey: "statsPeriod")
+        UserDefaults.standard.set(periodControl.selected, forKey: "statsPeriod")
         reload()
     }
 
@@ -157,7 +156,7 @@ final class StatsPane: NSObject {
         _ = view
         let now = Date()
         let all = History.shared.entries
-        let period = Period(rawValue: periodControl.selectedSegment) ?? .week
+        let period = Period(rawValue: periodControl.selected) ?? .week
         let st = DictationStats(all.filter { period.includes($0.date, now: now) })
 
         let values = [
@@ -168,7 +167,7 @@ final class StatsPane: NSObject {
         cards[5].accent = true
 
         let days = period == .month || period == .all ? 30 : 14
-        chartTitle.stringValue = tr("WORDS PER DAY — LAST \(days) DAYS", "СЛОВ ПО ДНЯМ — ПОСЛЕДНИЕ \(days) ДНЕЙ")
+        chartTitle.stringValue = tr("Words per day, last \(days) days", "Слов по дням, последние \(days) дней")
         chart.data = DictationStats.daily(all, days: days, now: now)
 
         fill(appsList, st.apps.prefix(6).map { ($0.name, $0.words) }, total: st.words)

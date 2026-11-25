@@ -26,18 +26,22 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
 
     /// One row of the sidebar.
     enum Item: Equatable {
-        case page(Page), list(UUID), addList
+        case page(Page), list(UUID), addList, archive
     }
 
-    /// Home, then the lists in their order, "New List", then the fixed pages.
+    /// Home, then the active lists in their order, "New List", "Archive" (only when a list is archived),
+    /// then the fixed pages.
     static func sidebarItems(_ lists: [VoiceList]) -> [Item] {
-        [.page(.home)] + lists.map { .list($0.id) } + [.addList, .page(.stats), .page(.vocabulary), .page(.settings)]
+        [.page(.home)] + lists.filter { !$0.isArchived }.map { .list($0.id) } + [.addList]
+            + (lists.contains(where: \.isArchived) ? [.archive] : [])
+            + [.page(.stats), .page(.vocabulary), .page(.settings)]
     }
 
     let home = HomePane()
     let stats = StatsPane()
     let vocabulary = VocabularyPane()
     let settings = SettingsPane()
+    let archive = ArchivePane()
     private var listPanes: [UUID: ListPane] = [:]
 
     private var window: NSWindow?
@@ -63,6 +67,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         home.onOpenStats = { [weak self] in self?.open(.stats) }
         History.shared.onChange = { [weak self] in self?.historyChanged() }
         VoiceLists.shared.onChange = { [weak self] id in self?.listsChanged(id) }
+        archive.onOpen = { [weak self] id in self?.openList(id) }
     }
 
     func open(_ p: Page? = nil) { present(p.map { .page($0) } ?? current) }
@@ -136,6 +141,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             listPanes = listPanes.filter { VoiceLists.shared.list($0.key) != nil }
             sidebar.reloadData()
             if case .list(let cur) = current, VoiceLists.shared.list(cur) == nil { current = .page(.home) }
+            if current == .archive, VoiceLists.shared.archived.isEmpty { current = .page(.home) }
             if isVisible { show(current, force: true) }
             return
         }
@@ -155,7 +161,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
     func editList(_ id: UUID?) {
         switch ListEditor.run(id.flatMap { VoiceLists.shared.list($0) }) {
         case .saved(let l): openList(l.id)
-        case .deleted: open(.home)
+        case .deleted, .archived: open(.home)
         case .cancelled: show(current, force: true)
         }
     }
@@ -182,6 +188,10 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             lp.reload()
             pane = lp.view
             title = VoiceLists.shared.list(id)?.name ?? title
+        case .archive:
+            archive.reload()
+            pane = archive.view
+            title = tr("Archive", "Архив")
         case .addList:
             return
         }
@@ -247,6 +257,9 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         sidebar.rowHeight = 34
         sidebar.dataSource = self
         sidebar.delegate = self
+        let sideMenu = NSMenu()
+        sideMenu.delegate = self
+        sidebar.menu = sideMenu
         let sideScroll = NSScrollView()
         sideScroll.documentView = sidebar
         sideScroll.drawsBackground = false
@@ -301,6 +314,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
             title = l?.name ?? "?"
             symbol = l?.kind == .tasks ? "checklist" : "note.text"
         case .addList: title = tr("New List", "Новый список"); symbol = "plus"; dim = true
+        case .archive: title = tr("Archive (\(VoiceLists.shared.archived.count))", "Архив (\(VoiceLists.shared.archived.count))"); symbol = "archivebox"; dim = true
         }
         let cell = NSTableCellView()
         let img = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: title) ?? NSImage())
@@ -337,6 +351,18 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
         }
         guard item != current || content.subviews.isEmpty else { return }
         show(item)
+    }
+
+    /// Demo: select the first entry of the page's list, to check the row highlight.
+    func demoSelectFirstEntry() {
+        if current == .page(.vocabulary) { vocabulary.demoExpand() }
+        func tables(_ v: NSView) -> [NSTableView] { (v as? NSTableView).map { [$0] } ?? v.subviews.flatMap(tables) }
+        for t in tables(content) {
+            let delegate = t.delegate
+            if let row = (0..<t.numberOfRows).first(where: { delegate?.tableView?(t, isGroupRow: $0) != true }) {
+                t.selectRowIndexes([row], byExtendingSelection: false)
+            }
+        }
     }
 
     /// Render the window content to PNG (used by --demo-window). The blurred desktop can't be captured
@@ -412,7 +438,7 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         let feedHead = NSStackView(views: [feedTitle, NSView(), more, Glass.searchCapsule(search, width: 240)])
         feedHead.spacing = 12
 
-        for (id, width) in [("time", 48.0), ("text", 600.0)] {
+        for (id, width) in [("time", 48.0 + ListPane.rowPad), ("text", 600.0)] {
             let c = NSTableColumn(identifier: .init(id))
             c.width = width
             if id == "text" { c.resizingMask = .autoresizingMask } else { c.resizingMask = [] }
@@ -630,7 +656,8 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
             }
         }
         NSLayoutConstraint.activate([
-            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            // Room between the row highlight capsule and the time / day header, as in the lists.
+            t.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: col?.identifier.rawValue == "text" ? 2 : ListPane.rowPad + 2),
             t.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
             t.topAnchor.constraint(equalTo: cell.topAnchor, constant: top),
             t.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -6),
@@ -700,5 +727,34 @@ final class HomePane: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSSe
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return }
         History.shared.clear()
+    }
+}
+
+// MARK: - Right-click on a list in the sidebar: edit, archive, delete
+
+extension MainWindow: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let row = sidebar.clickedRow
+        guard row >= 0, row < items.count, case .list(let id) = items[row] else { return }
+        for (title, sel) in [(tr("Edit List…", "Настроить…"), #selector(menuEditList(_:))),
+                             (tr("Move to Archive", "Убрать в архив"), #selector(menuArchiveList(_:))),
+                             (tr("Delete List…", "Удалить список…"), #selector(menuDeleteList(_:)))] {
+            let item = menu.addItem(withTitle: title, action: sel, keyEquivalent: "")
+            item.target = self
+            item.representedObject = id
+        }
+    }
+
+    @objc private func menuEditList(_ m: NSMenuItem) { (m.representedObject as? UUID).map { editList($0) } }
+
+    @objc private func menuArchiveList(_ m: NSMenuItem) {
+        guard let id = m.representedObject as? UUID else { return }
+        VoiceLists.shared.archive(id)
+    }
+
+    @objc private func menuDeleteList(_ m: NSMenuItem) {
+        guard let id = m.representedObject as? UUID, let l = VoiceLists.shared.list(id) else { return }
+        _ = ListEditor.confirmDelete(l)
     }
 }

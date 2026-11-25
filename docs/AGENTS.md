@@ -76,7 +76,7 @@ Hidden CLI modes of the binary (same code paths as the app, no UI):
 |---|---|
 | `vendor/whisper.cpp/` | Cloned by `build.sh` at a pinned commit. Change [`patches/whisper-jtm.patch`](../patches/whisper-jtm.patch) instead. |
 | `build/`, `dist/`, `models/` | Build output and downloaded models (git-ignored) |
-| `Resources/AppIcon.icns` | Generated from `Resources/AppIcon.svg` |
+| `Resources/AppIcon.icns` | Generated from `Resources/AppIcon.svg` by `scripts/make-icon.sh` (edit the SVG, then run it) |
 | `Resources/builtin_terms.txt`, `builtin_replacements.txt` | Shipped to **every** user. Never add client or personal names. A test enforces this. |
 
 ## Known gotchas

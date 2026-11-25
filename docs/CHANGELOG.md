@@ -10,10 +10,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app has no
 
 ## [Unreleased]
 
+### Added
+- **Archive for lists.** Right-click a list in the sidebar (or “Edit List…”) → “Move to Archive”: it leaves the sidebar, its command words stop working, the entries stay. “Archive (n)” in the sidebar opens, restores or deletes archived lists; on restore, command words another list took meanwhile are dropped and you are told. “Delete List…” is in the same right-click menu.
+- **Typed entries.** A field above every list adds an entry by typing; tasks start in Backlog.
+- **Edit an entry.** Double-click, Enter or right-click → “Edit…” changes the text of a note or task; its date stays.
+
 ### Fixed
+- Lists and the Home feed: the checkbox, time and day headers no longer touch the edge of the row highlight.
+- Statistics and Settings use the glass controls too: the period switch is a glass capsule, pop-up menus and buttons are glass capsules, and the right margin matches the other pages.
 - The theme switch icons are level and the chosen segment stays inside the capsule (capsule buttons no longer inherit the bezel insets).
 
 ### Changed
+- **New app icon in the light theme style.** The recording pill (glass capsule, orange dot, dark wave) on the soft peach-to-blue backdrop of the window, instead of the purple gradient. `scripts/make-icon.sh` rebuilds `AppIcon.icns` from `AppIcon.svg`.
+- **Dictionary page redesigned.** Instead of four text boxes with file syntax: your words are glass chips with an “Add” field, replacements are rows “recognised as → write instead”, the built-in dictionary is a switch with “Show List” (terms and fixes as small chips, each term once), and the recogniser prompt moved under “Advanced”. Every change is saved at once; the Save button is gone.
+- **Recording pill as in the Liquid Glass mock.** A 56 pt glass capsule with a pulsing orange recording dot, 24 thin bars, the elapsed time and a hint: “Esc to cancel”, “Tap to finish” in hands-free mode, “Transcribing…” with a blue dot and wave during recognition.
 - **Liquid Glass design.** The main window is now glass: the desktop shows through a blurred window with no title bar, the sidebar is a floating glass panel with a capsule for the chosen page, lists and the Home feed sit on glass cards, and buttons, search fields, filters and the status of a task are capsules. The task status is a capsule that opens a Backlog / Done menu; the list buttons (Done, To Backlog, Due Date…, Check All, Delete) are one glass bar under the list. Every page has a large title. The recording pill, the “Saved to …” card and the “No text field?” card are glass too and follow Light/Dark mode. Built from `NSVisualEffectView` and layers, so it works on macOS 13+ and respects “Reduce transparency” ([ADR 012](architecture/decisions/012-liquid-glass-design.md)).
 - **Toy-brick palette, no red.** The interface uses bright blue, yellow, green and orange (`Brick` in `Glass.swift`). The main action is tinted blue glass instead of a solid blue slab; Delete, Clear All and overdue dates are orange; Done is green; the recording dot and the menu-bar mic while recording are orange, transcribing is blue; the statistics chart is blue with today in orange.
 - **Light / Dark switch.** Auto (follows macOS), Light or Dark: at the bottom of the sidebar, on the Settings page (“Appearance”) and in the 🎙 menu → Settings. It applies to the window, the recording pill and the cards.

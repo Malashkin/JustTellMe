@@ -60,17 +60,19 @@ if let i = args.firstIndex(of: "--transcribe"), i + 1 < args.count {
 if args.contains("--demo-overlay") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
+    app.appearance = NSAppearance(named: args.contains("--dark") ? .darkAqua : .aqua)
     let o = RecordingOverlay()
     o.show(.recording)
+    if let n = o.windowNumber { FileHandle.standardError.write("window \(n)\n".data(using: .utf8)!) }
     var t = 0.0
     Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
         t += 0.05
         o.push(level: Float(0.02 + 0.08 * abs(sin(t * 3))))
     }
     let snap = opt("--demo-overlay")
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-rec.png")) } }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-rec.png"), dark: args.contains("--dark")) } }
     DispatchQueue.main.asyncAfter(deadline: .now() + 3) { o.show(.transcribing) }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-tr.png")) } }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { if let p = snap, p.hasSuffix(".png") { o.snapshot(to: URL(fileURLWithPath: p + "-tr.png"), dark: args.contains("--dark")) } }
     DispatchQueue.main.asyncAfter(deadline: .now() + 5) { o.hide() }
     DispatchQueue.main.asyncAfter(deadline: .now() + 5.6) { exit(0) }
     app.run()
@@ -131,7 +133,7 @@ if args.contains("--audio-info") {
     exit(0)
 }
 
-//   JustTellMe --demo-window out-prefix [--ok] [--dark]   (renders every page of the main window with the real history, for checking the layout)
+//   JustTellMe --demo-window out-prefix [--ok] [--dark] [--select]   (renders every page of the main window with the real history, for checking the layout)
 if let out = opt("--demo-window") {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
@@ -146,6 +148,7 @@ if let out = opt("--demo-window") {
         guard let p = pages.first else { exit(0) }
         pages.removeFirst()
         w.present(p)
+        if args.contains("--select") { w.demoSelectFirstEntry() }
         DispatchQueue.main.asyncAfter(deadline: .now() + (Double(ProcessInfo.processInfo.environment["JTM_DEMO_DELAY"] ?? "") ?? 0.8)) {
             w.snapshot(to: URL(fileURLWithPath: "\(out)-\(n).png"))
             n += 1

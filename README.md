@@ -26,7 +26,7 @@ Neural Engine: no cloud, no account, no subscription. Recognition is tuned for R
 
 ## How it works
 
-1. **Hold** Fn (or right ⌥) and speak. A small pill at the bottom of the screen shows your voice.
+1. **Hold** Fn (or right ⌥) and speak. A glass pill at the bottom of the screen shows your voice and the time.
 
    ![Recording](docs/images/overlay-recording.png)
 
@@ -65,6 +65,8 @@ A card confirms where the text went, with a button to open the list:
 ![Saved to Notes](docs/images/saved-card.png)
 
 - **Your own lists.** Click **New List** in the sidebar. Give the list a name and one or more command words separated by commas (“Idea, Thought”). Then choose its type: **Notes** for plain entries, or **Tasks**. **Edit List…** renames a list, changes its words or type, or deletes it.
+- **Type, not only speak.** The field above every list adds an entry by typing (Enter). To change an entry's text, double-click it, press Enter on it, or right-click → **Edit…**.
+- **Archive or delete lists.** Right-click a list in the sidebar (or use **Edit List…**) → **Move to Archive** or **Delete List…**. An archived list leaves the sidebar and its command words stop working, but its entries are kept; **Archive** in the sidebar opens, restores or deletes it.
 - **Forgiving matching.**
   - Only the first word counts, so “This note is about…” is pasted as usual.
   - Command words of 6 letters or more still match when the recogniser gets one letter wrong or splits the word in two («Замевка», «За метка»).
@@ -105,10 +107,11 @@ Everything you dictate is kept on **Home**, grouped by day, with the app it went
 
 ![Dictionary](docs/images/dictionary.png)
 
-- **Prompt.** An initial prompt that sets the style and how languages mix.
-- **Personal dictionary.** Your names, brands and terms; they are fed to the recogniser.
-- **Personal replacements.** Fixes applied after recognition, such as `пул реквест => pull request`.
-- **Built-in dictionary.** About 400 popular English terms and 100 fixes for how they come out of Russian speech. It is read-only and you can turn it off.
+Everything is saved as soon as you change it; there is no Save button.
+- **Your words.** Names, brands and terms as chips: type one and press Enter, click × to remove it. They are fed to the recogniser and keep their spelling.
+- **Replacements.** “Recognised as” → “Write instead”, such as `пул реквест` → `pull request`, applied after recognition.
+- **Built-in dictionary.** About 400 popular English terms and 100 fixes for how they come out of Russian speech. Read-only, with a switch to turn it off and a button to show the list.
+- **Recogniser prompt.** Under “Advanced”: a sentence that sets the style and how languages mix, with a button to restore the default.
 - **Correct and Remember…** Fix the last phrase once. New words go to the dictionary, and changed fragments become replacements.
 
 ### Settings
@@ -215,8 +218,8 @@ The binary `JustTellMe.app/Contents/MacOS/JustTellMe` accepts hidden flags:
 - `--list-models`
 - `--audio-info [--test-mute]`
 - `--demo-paste "text"`
-- `--demo-overlay [out.png]`
-- `--demo-window out-prefix [--ok] [--dark]`: PNGs of every page of the main window
+- `--demo-overlay [out.png] [--dark]`: shows the recording pill and prints its window number for `screencapture -l`
+- `--demo-window out-prefix [--ok] [--dark] [--select]`: PNGs of every page of the main window (`--select` highlights the first entry)
 - `--demo-card out.png`
 - `--demo-note-card out.png`
 - `--unload-cycle file.wav`
