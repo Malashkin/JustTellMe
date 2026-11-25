@@ -15,9 +15,9 @@ UI names below are the English ones. Recognition does not depend on this: it is 
 ## Dictation
 
 - **Hold to talk:** hold Fn (🌐) or right ⌥, speak, then release. The text is pasted at the cursor in any app.
-- **Hands-free (double tap):** double-tap the key (two presses, the second within 0.4 s) and speak without holding it; one more press stops and transcribes. An orange dot on the overlay shows this mode. Recording stops on its own after 5 minutes. A single stray tap does nothing. Other modes: “Hold, or tap once” (a single short tap starts hands-free) and “Hold only”.
+- **Hands-free (double tap):** double-tap the key (two presses, the second within 0.4 s) and speak without holding it; one more press stops and transcribes. The pill then says “Tap to finish” instead of “Esc to cancel”. Recording stops on its own after 5 minutes. A single stray tap does nothing. Other modes: “Hold, or tap once” (a single short tap starts hands-free) and “Hold only”.
 - **Esc** cancels the recording, or the recognition if it is already running.
-- **Overlay:** a pill at the bottom of the screen. A calm waveform shows recording; an orange animation shows recognition. It is drawn with Core Animation layers at 30 fps, about 2.4× less CPU than before.
+- **Overlay:** a glass pill at the bottom of the screen: a pulsing orange dot, a live waveform, the elapsed time (0:04) and a hint (“Esc to cancel”). During recognition the dot and the wave turn blue and the hint says “Transcribing…”. It is drawn with Core Animation layers at 30 fps, about 2.4× less CPU than before.
 - **Speed:** long speech is recognised in pieces while you talk, so the text appears about 1 s after release (Neural Engine) or 1–2 s (GPU), even after 30 s of speech.
 - **Languages:** Auto (Russian and English, leaning towards Russian), Russian, or English. English terms in Russian speech stay in Latin ("pull request", not a Cyrillic spelling such as «пул реквест»).
 - **Sounds** at start and end, **mute the speakers** while dictating, and **mic picker**. Each can be turned off or changed.

@@ -100,6 +100,20 @@ enum GlassTests {
             T.ok(Set(frames.map { Int($0.midY) }).count == 1, "same centre line \(frames.map(\.midY))")
             T.ok(Set(buttons.map { Int($0.image!.size.height) }).count == 1, "icons of one height \(buttons.map { $0.image!.size })")
         }
+        T.test("overlay: pill has a dot, 24 bars, a timer and a hint, all on one centre line") {
+            let o = RecordingOverlay()
+            T.eq(o.size.height, 56)
+            T.eq(RecordingOverlay.clockText(4), "0:04")
+            T.eq(RecordingOverlay.clockText(75), "1:15")
+            T.eq(WaveView.count, 24)
+            T.eq(WaveView.width, 141)
+            T.ok(o.clock.frame.maxX < o.hint.frame.minX && o.hint.frame.maxX <= o.size.width - 18, "timer, then hint, inside the pill")
+            T.ok(abs(o.clock.frame.midY - 28) <= 1 && abs(o.hint.frame.midY - 28) <= 1, "text centred vertically")
+            T.ok(o.size.width > 300 && o.size.width < 420, "width \(o.size.width)")
+            T.eq(o.hintText, tr("Esc to cancel", "Esc — отмена"))
+            o.locked = true
+            T.eq(o.hint.stringValue, tr("Tap to finish", "Нажмите — готово"))
+        }
         T.test("window buttons sit inside the sidebar panel") {
             let inset = MainWindow.windowButtonsInset
             let panel = NSRect(x: 10, y: 10, width: 210, height: 600)   // sidebar panel, from the top-left

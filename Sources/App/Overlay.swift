@@ -1,25 +1,86 @@
 import Cocoa
 
-/// Floating pill at the bottom of the screen: live waveform while recording,
-/// a travelling wave while transcribing. Never takes focus, so ⌘V still lands
-/// in the app the user was typing in.
+/// Floating glass pill at the bottom of the screen: a recording dot, a live waveform, the elapsed time
+/// and a hint ("Esc to cancel"). While transcribing the dot and the wave turn blue.
+/// Never takes focus, so ⌘V still lands in the app the user was typing in.
 final class RecordingOverlay {
     enum Mode { case hidden, recording, transcribing }
 
-    private let size = NSSize(width: 196, height: 50)
+    static let height: CGFloat = 56
+    static let padLeft: CGFloat = 18, padRight: CGFloat = 22, gap: CGFloat = 14
+    static let dotSize: CGFloat = 12, halo: CGFloat = 5
+
+    let size: NSSize
     private var panel: NSPanel?
-    private let wave = WaveView()
-    private let lockDot = NSView()
+    private let wave = WaveView(frame: NSRect(x: 0, y: 0, width: WaveView.width, height: 30))
+    private let dot = CALayer(), haloLayer = CALayer()
+    private let dotHost = NSView()
+    let clock = NSTextField(labelWithString: "0:00")
+    let hint = NSTextField(labelWithString: "")
+    private let content: NSView
     private var timer: Timer?
     private var hideWork: DispatchWorkItem?
+    private var startedAt: Date?
+    private(set) var mode: Mode = .hidden
+
+    static func clockText(_ seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
+
+    var hintText: String {
+        switch mode {
+        case .transcribing: return tr("Transcribing…", "Распознаю…")
+        default: return locked ? tr("Tap to finish", "Нажмите — готово") : tr("Esc to cancel", "Esc — отмена")
+        }
+    }
+
+    init() {
+        let clockFont = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold), hintFont = NSFont.systemFont(ofSize: 12)
+        clock.font = clockFont
+        clock.textColor = .labelColor
+        hint.font = hintFont
+        hint.textColor = .secondaryLabelColor
+        // A fixed width (the longest hint), so the pill does not jump when the hint changes.
+        let hints = [tr("Transcribing…", "Распознаю…"), tr("Tap to finish", "Нажмите — готово"), tr("Esc to cancel", "Esc — отмена")]
+        let hintW = ceil(hints.map { ($0 as NSString).size(withAttributes: [.font: hintFont]).width }.max()!) + 4
+        let clockW = ceil(("00:00" as NSString).size(withAttributes: [.font: clockFont]).width) + 2
+        let h = Self.height
+        var x = Self.padLeft
+        dotHost.frame = NSRect(x: x - Self.halo, y: (h - Self.dotSize) / 2 - Self.halo, width: Self.dotSize + Self.halo * 2, height: Self.dotSize + Self.halo * 2)
+        x += Self.dotSize + Self.gap
+        wave.frame.origin = NSPoint(x: x, y: (h - wave.frame.height) / 2)
+        x += wave.frame.width + Self.gap
+        let clockH = ceil(clock.fittingSize.height), hintH = ceil(hint.fittingSize.height)
+        clock.frame = NSRect(x: x, y: (h - clockH) / 2, width: clockW, height: clockH)
+        x += clockW + 10
+        hint.frame = NSRect(x: x, y: (h - hintH) / 2, width: hintW, height: hintH)
+        x += hintW + Self.padRight - 4
+        size = NSSize(width: ceil(x), height: h)
+
+        // A glass capsule: the blurred screen behind it and a light edge.
+        // maskImage (not layer.cornerRadius) is what actually clips the behind-window blur to the pill shape.
+        content = Glass.backdrop(.popover, radius: h / 2)
+        content.frame = NSRect(origin: .zero, size: size)
+        dotHost.wantsLayer = true
+        haloLayer.frame = dotHost.bounds
+        haloLayer.cornerRadius = dotHost.bounds.width / 2
+        dot.frame = dotHost.bounds.insetBy(dx: Self.halo, dy: Self.halo)
+        dot.cornerRadius = Self.dotSize / 2
+        dotHost.layer?.addSublayer(haloLayer)
+        dotHost.layer?.addSublayer(dot)
+        for v in [dotHost, wave, clock, hint] { content.addSubview(v) }
+        restyle()
+    }
 
     func show(_ mode: Mode) {
         hideWork?.cancel()
         switch mode {
         case .hidden: hide(); return
-        case .recording: if wave.mode != .recording { wave.reset() }; wave.mode = .recording
+        case .recording:
+            if self.mode != .recording { wave.reset(); startedAt = Date(); clock.stringValue = Self.clockText(0) }
+            wave.mode = .recording
         case .transcribing: wave.mode = .transcribing; locked = false
         }
+        self.mode = mode
+        restyle()
         let p = panel ?? makePanel()
         panel = p
         position(p)
@@ -29,7 +90,7 @@ final class RecordingOverlay {
             NSAnimationContext.runAnimationGroup { $0.duration = 0.15; p.animator().alphaValue = 1 }
         }
         if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 1.0 / WaveView.fps, repeats: true) { [weak self] _ in self?.wave.tick() }
+            timer = Timer.scheduledTimer(withTimeInterval: 1.0 / WaveView.fps, repeats: true) { [weak self] _ in self?.tick() }
             timer?.tolerance = 0.2 / WaveView.fps
             RunLoop.main.add(timer!, forMode: .common)
         }
@@ -37,31 +98,64 @@ final class RecordingOverlay {
 
     func push(level: Float) { wave.push(level) }
 
-    /// Hands-free recording (key was tapped, not held): a red dot shows it keeps listening until the next tap.
-    var locked = false { didSet { lockDot.isHidden = !locked } }
+    /// The pill's window, for screen captures in the demo.
+    var windowNumber: Int? { panel?.windowNumber }
+
+    /// Hands-free recording (key was tapped, not held): the hint says how to finish.
+    var locked = false { didSet { if locked != oldValue { restyle() } } }
+
+    private func tick() {
+        wave.tick()
+        if mode == .recording, let t = startedAt {
+            let text = Self.clockText(Int(Date().timeIntervalSince(t)))
+            if clock.stringValue != text { clock.stringValue = text }
+        }
+    }
+
+    private func restyle() {
+        hint.stringValue = hintText
+        let color = mode == .transcribing ? Brick.blue : Brick.orange
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        dot.backgroundColor = color.cgColor
+        haloLayer.backgroundColor = color.withAlphaComponent(0.22).cgColor
+        CATransaction.commit()
+        if mode == .recording, haloLayer.animation(forKey: "pulse") == nil {
+            let a = CABasicAnimation(keyPath: "opacity")
+            a.fromValue = 1; a.toValue = 0.35; a.duration = 0.8
+            a.autoreverses = true; a.repeatCount = .infinity
+            a.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            haloLayer.add(a, forKey: "pulse")
+        } else if mode != .recording {
+            haloLayer.removeAnimation(forKey: "pulse")
+        }
+    }
 
     /// Debug: write the pill as PNG (used by --demo-overlay to check the look without screen recording).
-    func snapshot(to url: URL) {
+    func snapshot(to url: URL, dark: Bool = false) {
         // The bars are plain CALayers, which cacheDisplay does not draw: render the layer tree instead.
-        guard let v = panel?.contentView, let layer = v.layer,
+        let v = content
+        content.displayIfNeeded()
+        guard let layer = v.layer,
               let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(v.bounds.width) * 2, pixelsHigh: Int(v.bounds.height) * 2,
                                          bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                          colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
               let ctx = NSGraphicsContext(bitmapImageRep: rep)?.cgContext else { return }
         ctx.scaleBy(x: 2, y: 2)
-        ctx.setFillColor(NSColor(calibratedRed: 0.78, green: 0.82, blue: 0.95, alpha: 1).cgColor)
+        ctx.setFillColor(dark ? NSColor(calibratedRed: 0.16, green: 0.17, blue: 0.24, alpha: 1).cgColor
+                              : NSColor(calibratedRed: 0.78, green: 0.82, blue: 0.95, alpha: 1).cgColor)
         ctx.fill(v.bounds)
         layer.render(in: ctx)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
     }
 
     func hide() {
-        guard let p = panel, p.isVisible else { wave.mode = .hidden; locked = false; return }
+        guard let p = panel, p.isVisible else { wave.mode = .hidden; mode = .hidden; locked = false; return }
         let work = DispatchWorkItem { [weak self] in
             NSAnimationContext.runAnimationGroup({ $0.duration = 0.2; p.animator().alphaValue = 0 }) {
                 guard self?.hideWork?.isCancelled == false else { return }
                 p.orderOut(nil)
                 self?.wave.mode = .hidden
+                self?.mode = .hidden
                 self?.locked = false
                 self?.timer?.invalidate()
                 self?.timer = nil
@@ -82,20 +176,7 @@ final class RecordingOverlay {
         p.ignoresMouseEvents = true
         p.hidesOnDeactivate = false
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-
-        // A glass capsule: the blurred screen behind it, a light edge, bars in the label color.
-        // maskImage (not layer.cornerRadius) is what actually clips the behind-window blur to the pill shape.
-        let bg = Glass.backdrop(.popover, radius: size.height / 2)
-        bg.frame = NSRect(origin: .zero, size: size)
-        wave.frame = bg.bounds.insetBy(dx: 24, dy: 10)
-        bg.addSubview(wave, positioned: .below, relativeTo: nil)
-        lockDot.frame = NSRect(x: 9, y: (size.height - 9) / 2, width: 9, height: 9)
-        lockDot.wantsLayer = true
-        lockDot.layer?.cornerRadius = 4.5
-        lockDot.layer?.backgroundColor = Brick.orange.cgColor
-        lockDot.isHidden = !locked
-        bg.addSubview(lockDot)
-        p.contentView = bg
+        p.contentView = content
         return p
     }
 
@@ -109,12 +190,14 @@ final class RecordingOverlay {
 }
 
 /// Bars are CALayers whose frames are set directly (no implicit animations), so a frame costs no
-/// view redraw: the window server only recomposites 18 small rectangles. 30 updates a second
+/// view redraw: the window server only recomposites 24 small rectangles. 30 updates a second
 /// look as smooth as 60 for this motion, at half the wake-ups.
 final class WaveView: NSView {
     static let fps = 30.0
+    static let count = 24, barWidth: CGFloat = 3, barGap: CGFloat = 3
+    static var width: CGFloat { CGFloat(count) * barWidth + CGFloat(count - 1) * barGap }
     var mode: RecordingOverlay.Mode = .recording { didSet { if mode != oldValue { recolor() } } }
-    private let count = 18
+    private let count = WaveView.count
     private var levels: [CGFloat]     // sampled history, scrolls left
     private var shown: [CGFloat]      // what is drawn, eases toward `levels`
     private var target: CGFloat = 0
@@ -185,7 +268,7 @@ final class WaveView: NSView {
     }
 
     private func recolor() {
-        let c = cg(mode == .transcribing ? Brick.blueText : NSColor.labelColor.withAlphaComponent(0.85))
+        let c = cg(mode == .transcribing ? Brick.blueText : NSColor.labelColor.withAlphaComponent(0.82))
         CATransaction.begin(); CATransaction.setDisableActions(true)
         for b in bars { b.backgroundColor = c }
         CATransaction.commit()
@@ -193,7 +276,7 @@ final class WaveView: NSView {
 
     private func layoutBars() {
         let w = bounds.width, h = bounds.height
-        let gap: CGFloat = 3
+        let gap = Self.barGap
         let barW = (w - gap * CGFloat(count - 1)) / CGFloat(count)
         CATransaction.begin(); CATransaction.setDisableActions(true)
         for (i, b) in bars.enumerated() {

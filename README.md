@@ -26,7 +26,7 @@ Neural Engine: no cloud, no account, no subscription. Recognition is tuned for R
 
 ## How it works
 
-1. **Hold** Fn (or right ⌥) and speak. A small pill at the bottom of the screen shows your voice.
+1. **Hold** Fn (or right ⌥) and speak. A glass pill at the bottom of the screen shows your voice and the time.
 
    ![Recording](docs/images/overlay-recording.png)
 
@@ -215,7 +215,7 @@ The binary `JustTellMe.app/Contents/MacOS/JustTellMe` accepts hidden flags:
 - `--list-models`
 - `--audio-info [--test-mute]`
 - `--demo-paste "text"`
-- `--demo-overlay [out.png]`
+- `--demo-overlay [out.png] [--dark]`: shows the recording pill and prints its window number for `screencapture -l`
 - `--demo-window out-prefix [--ok] [--dark]`: PNGs of every page of the main window
 - `--demo-card out.png`
 - `--demo-note-card out.png`
