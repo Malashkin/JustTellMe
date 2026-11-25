@@ -138,6 +138,37 @@ final class Vocabulary {
         reload()
     }
 
+    /// Store the recogniser prompt. A prompt equal to the default is not stored.
+    func setPrompt(_ prompt: String) {
+        let p = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if p.isEmpty || p == Self.defaultPrompt { try? FileManager.default.removeItem(at: Paths.prompt) }
+        else { try? p.write(to: Paths.prompt, atomically: true, encoding: .utf8) }
+        reload()
+    }
+
+    /// Removes a personal word (any case). Comment lines and other words stay as they are.
+    func removeTerm(_ term: String) {
+        let key = term.lowercased()
+        rewrite(Paths.dictionary) { $0.lowercased() != key }
+    }
+
+    /// Removes a personal replacement by its "wrong" side (any case).
+    func removeRule(from: String) {
+        let key = from.lowercased()
+        rewrite(Paths.replacements) { Self.parseRule($0).map { $0.0.lowercased() != key } ?? true }
+    }
+
+    /// Keeps the comment and blank lines, and the other lines for which `keep` is true.
+    private func rewrite(_ url: URL, keep: (String) -> Bool) {
+        let lines = ((try? String(contentsOf: url, encoding: .utf8)) ?? "").components(separatedBy: "\n")
+        let kept = lines.filter { line in
+            let t = line.trimmingCharacters(in: .whitespaces)
+            return t.isEmpty || t.hasPrefix("#") || keep(t)
+        }
+        try? kept.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        reload()
+    }
+
     /// Adds to the PERSONAL dictionary (skips anything already known, built-in included).
     func addTerms(_ new: [String]) -> [String] {
         let existing = Set((personalTerms + (builtinEnabled ? builtinTerms : [])).map { $0.lowercased() })

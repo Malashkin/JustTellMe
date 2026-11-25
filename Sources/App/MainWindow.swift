@@ -343,6 +343,7 @@ final class MainWindow: NSObject, NSWindowDelegate, NSTableViewDataSource, NSTab
     /// this way, so the glass is drawn over a soft sample wallpaper instead.
     /// Demo: select the first entry of the page's list, to check the row highlight.
     func demoSelectFirstEntry() {
+        if current == .page(.vocabulary) { vocabulary.demoExpand() }
         func tables(_ v: NSView) -> [NSTableView] { (v as? NSTableView).map { [$0] } ?? v.subviews.flatMap(tables) }
         for t in tables(content) {
             let delegate = t.delegate

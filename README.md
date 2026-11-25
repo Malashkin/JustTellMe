@@ -105,10 +105,11 @@ Everything you dictate is kept on **Home**, grouped by day, with the app it went
 
 ![Dictionary](docs/images/dictionary.png)
 
-- **Prompt.** An initial prompt that sets the style and how languages mix.
-- **Personal dictionary.** Your names, brands and terms; they are fed to the recogniser.
-- **Personal replacements.** Fixes applied after recognition, such as `пул реквест => pull request`.
-- **Built-in dictionary.** About 400 popular English terms and 100 fixes for how they come out of Russian speech. It is read-only and you can turn it off.
+Everything is saved as soon as you change it; there is no Save button.
+- **Your words.** Names, brands and terms as chips: type one and press Enter, click × to remove it. They are fed to the recogniser and keep their spelling.
+- **Replacements.** “Recognised as” → “Write instead”, such as `пул реквест` → `pull request`, applied after recognition.
+- **Built-in dictionary.** About 400 popular English terms and 100 fixes for how they come out of Russian speech. Read-only, with a switch to turn it off and a button to show the list.
+- **Recogniser prompt.** Under “Advanced”: a sentence that sets the style and how languages mix, with a button to restore the default.
 - **Correct and Remember…** Fix the last phrase once. New words go to the dictionary, and changed fragments become replacements.
 
 ### Settings
